@@ -1,6 +1,6 @@
 ﻿import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useExchange } from '../../hooks/useExchange';
-import type { TickerItem, HistoryLog } from '../../context/ExchangeContext';
+import type { TickerItem, HistoryLog, Rate } from '../../context/ExchangeContext';
 import UserTracking from './UserTracking';
 import KarHesaplama from './KarHesaplama';
 import Announcements from './Announcements';
@@ -310,13 +310,40 @@ const Dashboard: React.FC = () => {
 
 
 
+    const saveCalculatedRates = (ratesToSave: Rate[]) => {
+        const calculatedRates = ratesToSave.map(newRate => {
+            const oldRate = rates.find(r => r.id === newRate.id);
+            let change = '0.00';
+
+            if (oldRate) {
+                const oldSell = parsePrice(oldRate.sell);
+                const newSell = parsePrice(newRate.sell);
+
+                if (oldSell !== newSell && oldSell !== 0) {
+                    const diff = ((newSell - oldSell) / oldSell) * 100;
+                    change = diff.toFixed(2);
+                } else {
+                    change = oldRate.change || '0.00';
+                }
+            } else if (newRate.change) {
+                change = newRate.change;
+            }
+
+            return { ...newRate, change };
+        });
+
+        setLocalRates(calculatedRates);
+        updateRates(calculatedRates);
+        return calculatedRates;
+    };
+
     const handleBuySave = () => {
         const amount = bulkBuyAmount;
         const newRates = localRates.map(rate => ({
             ...rate,
             buy: (parsePrice(rate.buy) + amount).toFixed(2)
         }));
-        setLocalRates(newRates);
+        saveCalculatedRates(newRates);
         setBulkBuyAmount(0);
         setBuyOverlayAnim(true);
         setTimeout(() => setBuyOverlayAnim(false), 1500);
@@ -328,7 +355,7 @@ const Dashboard: React.FC = () => {
             ...rate,
             sell: (parsePrice(rate.sell) + amount).toFixed(2)
         }));
-        setLocalRates(newRates);
+        saveCalculatedRates(newRates);
         setBulkSellAmount(0);
         setSellOverlayAnim(true);
         setTimeout(() => setSellOverlayAnim(false), 1500);
@@ -376,7 +403,7 @@ const Dashboard: React.FC = () => {
             };
         });
 
-        setLocalRates(newRates);
+        saveCalculatedRates(newRates);
         setUpdateOverlayAnim(true);
         setTimeout(() => setUpdateOverlayAnim(false), 1500);
     };
@@ -400,34 +427,7 @@ const Dashboard: React.FC = () => {
         }
 
         // Calculate changes before saving
-        const calculatedRates = localRates.map(newRate => {
-            const oldRate = rates.find(r => r.id === newRate.id);
-            let change = '0.00';
-
-            if (oldRate) {
-                const oldSell = parsePrice(oldRate.sell);
-                const newSell = parsePrice(newRate.sell);
-
-                if (oldSell !== newSell && oldSell !== 0) {
-                    const diff = ((newSell - oldSell) / oldSell) * 100;
-                    change = diff.toFixed(2);
-                } else {
-                    // If price hasn't changed, preserve the existing change value
-                    change = oldRate.change || '0.00';
-                }
-            }
-            // Preserve existing change if no old rate found (e.g. just added but saved twice)
-            else if (newRate.change) {
-                change = newRate.change;
-            }
-
-            return { ...newRate, change };
-        });
-
-        // Update local state to reflect new changes immediately
-        setLocalRates(calculatedRates);
-
-        updateRates(calculatedRates);
+        saveCalculatedRates(localRates);
         updateTickerItems(localTickerItems);
         updateMembers(localMembers);
         // addHistorySnapshot() not needed as context logs directly

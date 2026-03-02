@@ -305,7 +305,13 @@ const UserPanel: React.FC = () => {
         };
         localStorage.setItem(getUserSettingsKey(currentUser.name), JSON.stringify(newSettings));
         setUserSettings(newSettings);
-        alert('Ayarlar başarıyla güncellendi!');
+
+        // ALSO SAVE RATES AND TICKER ITEMS
+        updateRates(localRates);
+        updateTickerItems(localTickerItems);
+        setHasChanges(false);
+
+        alert('Ayarlar ve kurlar başarıyla güncellendi!');
     };
 
     const handleLogout = () => {
