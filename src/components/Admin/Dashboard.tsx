@@ -6,6 +6,7 @@ import KarHesaplama from './KarHesaplama';
 import Announcements from './Announcements';
 import PriceAlerts from './PriceAlerts';
 import NotificationBell from '../Shared/NotificationBell';
+import ProfileModal from '../Shared/ProfileModal';
 import { Zap } from 'lucide-react';
 import './Members.css';
 import './History.css';
@@ -19,10 +20,13 @@ const Dashboard: React.FC = () => {
     const [localRates, setLocalRates] = useState(rates);
     const [localTickerItems, setLocalTickerItems] = useState(tickerItems);
     const [localMembers, setLocalMembers] = useState(members);
-    const [activeTab, setActiveTab] = useState<'home' | 'rates' | 'members' | 'history' | 'user_tracking' | 'kar_hesaplama' | 'announcements' | 'price_alerts'>('home');
+    const [activeTab, setActiveTab] = useState<'home' | 'rates' | 'members' | 'history' | 'user_tracking' | 'kar_hesaplama' | 'announcements'>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [tableWidth, setTableWidth] = useState<number | null>(null);
     const tableContainerRef = useRef<HTMLDivElement>(null);
+
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     const startResize = useCallback((e: React.MouseEvent, side: 'left' | 'right') => {
         e.preventDefault();
@@ -91,6 +95,7 @@ const Dashboard: React.FC = () => {
     const [editMemberId, setEditMemberId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const [editUsername, setEditUsername] = useState('');
+    const [editShopName, setEditShopName] = useState('');
     const [editPwNew, setEditPwNew] = useState('');
     const [editPwConfirm, setEditPwConfirm] = useState('');
     const [editPwError, setEditPwError] = useState<string | null>(null);
@@ -100,6 +105,7 @@ const Dashboard: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [addName, setAddName] = useState('');
     const [addUsername, setAddUsername] = useState('');
+    const [addShopName, setAddShopName] = useState('');
     const [addPassword, setAddPassword] = useState('');
     const [addRole, setAddRole] = useState('Üye');
     const [addError, setAddError] = useState<string | null>(null);
@@ -145,6 +151,26 @@ const Dashboard: React.FC = () => {
     const [historyPage, setHistoryPage] = useState(0);
     const [openHistoryGroups, setOpenHistoryGroups] = useState<string[]>([]);
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClick = () => setDropdownOpen(false);
+        if (dropdownOpen) {
+            setTimeout(() => document.addEventListener('click', handleClick), 0);
+            return () => document.removeEventListener('click', handleClick);
+        }
+    }, [dropdownOpen]);
+
+    const getRoleBadge = (role: string) => {
+        const colors: Record<string, { bg: string; text: string; border: string }> = {
+            'Admin': { bg: 'rgba(239, 68, 68, 0.15)', text: '#F87171', border: 'rgba(239, 68, 68, 0.3)' },
+            'Yönetici': { bg: 'rgba(96, 165, 250, 0.15)', text: '#60A5FA', border: 'rgba(96, 165, 250, 0.3)' },
+            'Üye': { bg: 'rgba(156, 163, 175, 0.15)', text: '#9CA3AF', border: 'rgba(156, 163, 175, 0.3)' },
+        };
+        return colors[role] || colors['Üye'];
+    };
+
+    const roleBadge = getRoleBadge(currentUser?.role || 'Admin');
+
     const parsePrice = (priceStr: string | number) => {
         if (typeof priceStr === 'number') return priceStr;
         let str = priceStr.toString().trim();
@@ -170,7 +196,7 @@ const Dashboard: React.FC = () => {
 
     // Fetch Backend Data
     const fetchMarketData = useCallback(async () => {
-        if (activeTab !== 'home' && activeTab !== 'price_alerts') return;
+        if (activeTab !== 'home') return;
 
         try {
             setError(null);
@@ -575,6 +601,7 @@ const Dashboard: React.FC = () => {
     const handleAddMember = () => {
         setAddName('');
         setAddUsername('');
+        setAddShopName('');
         setAddPassword('');
         setAddRole('Üye');
         setAddError(null);
@@ -852,6 +879,7 @@ const Dashboard: React.FC = () => {
                                                     setEditMemberId(member.id);
                                                     setEditName(member.name);
                                                     setEditUsername(member.username);
+                                                    setEditShopName(member.shopName || '');
                                                     setEditPwNew('');
                                                     setEditPwConfirm('');
                                                     setEditPwError(null);
@@ -949,6 +977,15 @@ const Dashboard: React.FC = () => {
                                         style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
                                     />
                                 </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px' }}>Dükkan İsmi</label>
+                                    <input
+                                        type="text"
+                                        value={editShopName}
+                                        onChange={e => setEditShopName(e.target.value)}
+                                        style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+                                    />
+                                </div>
 
                                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '8px 0' }}></div>
                                 <div style={{ fontSize: '13px', color: '#94a3b8' }}>Şifre Güncelle (Değiştirmek istemiyorsanız boş bırakın)</div>
@@ -1008,7 +1045,8 @@ const Dashboard: React.FC = () => {
                                             newMembers[index] = {
                                                 ...newMembers[index],
                                                 name: editName,
-                                                username: editUsername
+                                                username: editUsername,
+                                                shopName: editShopName
                                             };
                                             setLocalMembers(newMembers);
                                         }
@@ -1108,6 +1146,16 @@ const Dashboard: React.FC = () => {
                                     />
                                 </div>
                                 <div>
+                                    <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px' }}>Dükkan İsmi</label>
+                                    <input
+                                        type="text"
+                                        value={addShopName}
+                                        onChange={e => { setAddShopName(e.target.value); setAddError(null); }}
+                                        style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+                                        placeholder="Örn: SADO SARRAFİYE"
+                                    />
+                                </div>
+                                <div>
                                     <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px' }}>Şifre</label>
                                     <input
                                         type="password"
@@ -1162,6 +1210,7 @@ const Dashboard: React.FC = () => {
                                             id: crypto.randomUUID(),
                                             name: addName.trim(),
                                             username: addUsername.trim(),
+                                            shopName: addShopName.trim() || `${addName.trim().toUpperCase()} SARRAFİYE`,
                                             password: addPassword,
                                             role: addRole,
                                             status: 'Aktif'
@@ -2007,13 +2056,7 @@ const Dashboard: React.FC = () => {
                             onClick={() => setActiveTab('kar_hesaplama')}
                             isOpen={isSidebarOpen}
                         />
-                        <SidebarItem
-                            label="Fiyat Alarmları"
-                            tab="price_alerts"
-                            activeTab={activeTab}
-                            onClick={() => setActiveTab('price_alerts')}
-                            isOpen={isSidebarOpen}
-                        />
+
                     </ul>
                 </nav>
 
@@ -2064,21 +2107,134 @@ const Dashboard: React.FC = () => {
                             {activeTab === 'user_tracking' && 'Anlık Kullanıcı Takibi'}
                             {activeTab === 'kar_hesaplama' && 'Kar Hesaplama'}
                             {activeTab === 'announcements' && 'Duyuru ve Bildirim Yönetimi'}
-                            {activeTab === 'price_alerts' && 'Fiyat Alarm Sistemi'}
+
                         </h1>
                         <p style={{ color: '#8B97B8', fontSize: '14px', marginTop: '4px' }}>Kurmatik.net Yönetim Sistemi</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <NotificationBell />
                         <a href="/" target="_blank" style={{
                             color: '#F5D56E',
                             textDecoration: 'none',
                             fontSize: '14px',
                             fontWeight: 600,
-                            border: '1px solid #D4A731',
                             padding: '8px 16px',
-                            borderRadius: '6px'
-                        }}>Sistem Ekranını Aç &rarr;</a>
+                            background: 'rgba(212, 167, 49, 0.1)',
+                            border: '1px solid rgba(212, 167, 49, 0.2)',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                        }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212, 167, 49, 0.2)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(212, 167, 49, 0.1)'; }}
+                        >Sistem Ekranını Aç &rarr;</a>
+
+                        <NotificationBell />
+
+                        {/* User info with dropdown */}
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setDropdownOpen(!dropdownOpen); }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    background: dropdownOpen ? 'rgba(212, 167, 49, 0.08)' : 'transparent',
+                                    border: dropdownOpen ? '1px solid rgba(212, 167, 49, 0.2)' : '1px solid transparent',
+                                    borderRadius: '12px',
+                                    padding: '6px 14px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s',
+                                }}
+                            >
+                                <div style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '10px',
+                                    background: `linear-gradient(135deg, ${roleBadge.bg}, ${roleBadge.border})`,
+                                    border: `1px solid ${roleBadge.border}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '14px',
+                                    fontWeight: 800,
+                                    color: roleBadge.text,
+                                }}>
+                                    {currentUser?.name ? currentUser.name[0].toUpperCase() : '?'}
+                                </div>
+                                <div style={{ textAlign: 'left' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#C8D4E8' }}>{currentUser?.name || 'Yönetici'}</div>
+                                    <span style={{
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        color: roleBadge.text,
+                                        background: roleBadge.bg,
+                                        padding: '2px 8px',
+                                        borderRadius: '6px',
+                                        border: `1px solid ${roleBadge.border}`,
+                                    }}>{currentUser?.role || 'Admin'}</span>
+                                </div>
+                                <span style={{
+                                    color: '#5A6480',
+                                    fontSize: '12px',
+                                    transition: 'transform 0.3s',
+                                    transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                }}>▼</span>
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {dropdownOpen && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    right: 0,
+                                    marginTop: '8px',
+                                    background: 'rgba(20, 28, 50, 0.98)',
+                                    border: '1px solid rgba(212, 167, 49, 0.2)',
+                                    borderRadius: '14px',
+                                    padding: '8px',
+                                    minWidth: '220px',
+                                    boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                                    backdropFilter: 'blur(20px)',
+                                    animation: 'fadeIn 0.2s ease',
+                                    zIndex: 200,
+                                }}>
+                                    <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '4px' }}>
+                                        <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{currentUser?.name}</div>
+                                        <div style={{ color: '#8B97B8', fontSize: '12px' }}>{currentUser?.username ? `@${currentUser.username}` : ''}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => { setShowProfileModal(true); setDropdownOpen(false); }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
+                                            padding: '10px 12px', border: 'none', borderRadius: '8px',
+                                            cursor: 'pointer', transition: 'all 0.2s',
+                                            fontSize: '13px', fontWeight: 600, textAlign: 'left',
+                                            color: '#C8D4E8', background: 'transparent'
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                        <span>👤</span> Üye Bilgileri
+                                    </button>
+
+                                    <div style={{ height: '1px', background: 'rgba(212, 167, 49, 0.1)', margin: '6px 8px' }} />
+
+                                    <button
+                                        onClick={handleLogout}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
+                                            padding: '10px 12px', border: 'none', borderRadius: '8px',
+                                            cursor: 'pointer', transition: 'all 0.2s',
+                                            fontSize: '13px', fontWeight: 600, textAlign: 'left',
+                                            color: '#F87171', background: 'transparent'
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                        <span>🚪</span> Çıkış Yap
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </header>
 
@@ -2095,9 +2251,7 @@ const Dashboard: React.FC = () => {
                     {activeTab === 'announcements' && (
                         <Announcements />
                     )}
-                    {activeTab === 'price_alerts' && (
-                        <PriceAlerts marketData={marketData} lastUpdate={lastHomeUpdate} error={error} />
-                    )}
+
                     {activeTab === 'history' && (
                         <div className="history-page">
                             {/* İSTATİSTİKLER */}
@@ -2494,7 +2648,13 @@ const Dashboard: React.FC = () => {
                     `}} />
                 </div>
             )}
-        </div >
+
+            {/* Profile Modal */}
+            <ProfileModal
+                isOpen={showProfileModal}
+                onClose={() => setShowProfileModal(false)}
+            />
+        </div>
     );
 };
 

@@ -40,6 +40,8 @@ export interface Member {
     password: string;
     role: UserRole;
     status: 'Aktif' | 'Pasif';
+    shopName?: string;
+    email?: string;
 }
 
 export interface HistoryLog {
@@ -100,6 +102,7 @@ export interface ExchangeContextType {
     updateTickerItems: (newItems: TickerItem[]) => void;
     updateMembers: (newMembers: Member[]) => void;
     updateMemberPassword: (memberId: string, newPassword: string) => Promise<boolean>;
+    updateCurrentMemberProfile: (updates: { name: string; email?: string; shopName?: string }) => Promise<boolean>;
     clearHistory: () => Promise<void>;
     authenticateUser: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: Member }>;
     logoutUser: () => Promise<void>;
@@ -238,7 +241,11 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
                 if (membersError) console.error('Error fetching members:', membersError);
 
                 if (membersData && mounted) {
-                    setMembers(membersData as Member[]);
+                    const mappedMembers = membersData.map((m: any) => ({
+                        ...m,
+                        shopName: m.shop_name
+                    }));
+                    setMembers(mappedMembers as Member[]);
                 }
 
                 // Fetch History Logs
@@ -581,7 +588,14 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
     const updateMembers = async (newMembers: Member[]) => {
         setMembers(newMembers);
         try {
-            const { error } = await supabase.from('members').upsert(newMembers, { onConflict: 'username' });
+            const dbMembers = newMembers.map((m) => {
+                const { shopName, ...rest } = m;
+                return {
+                    ...rest,
+                    shop_name: shopName
+                };
+            });
+            const { error } = await supabase.from('members').upsert(dbMembers, { onConflict: 'username' });
             if (error) {
                 console.error('Error updating members:', error);
                 alert('Üyeler kaydedilirken hata oluştu: ' + error.message);
@@ -606,6 +620,31 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
             return true;
         } catch (error) {
             console.error('Unexpected error updating password:', error);
+            return false;
+        }
+    };
+
+    const updateCurrentMemberProfile = async (updates: { name: string; email?: string; shopName?: string }): Promise<boolean> => {
+        if (!currentUser) return false;
+        try {
+            const { error } = await supabase.from('members').update({
+                name: updates.name,
+                email: updates.email,
+                shop_name: updates.shopName
+            }).eq('id', currentUser.id);
+
+            if (error) {
+                console.error('Error updating profile:', error);
+                return false;
+            }
+
+            const updatedMember = { ...currentUser, name: updates.name, email: updates.email, shopName: updates.shopName };
+            setCurrentUser(updatedMember);
+            localStorage.setItem('currentUser', JSON.stringify(updatedMember));
+            setMembers(prev => prev.map(m => m.id === currentUser.id ? updatedMember : m));
+            return true;
+        } catch (error) {
+            console.error('Unexpected error updating profile:', error);
             return false;
         }
     };
@@ -681,6 +720,7 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
             updateTickerItems,
             updateMembers,
             updateMemberPassword,
+            updateCurrentMemberProfile,
             clearHistory,
             authenticateUser,
             logoutUser,

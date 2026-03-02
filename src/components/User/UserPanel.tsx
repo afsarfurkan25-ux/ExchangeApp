@@ -5,6 +5,8 @@ import KarHesaplama from '../Admin/KarHesaplama';
 import NotificationBell from '../Shared/NotificationBell';
 import Announcements from '../Admin/Announcements';
 import PriceAlerts from '../Admin/PriceAlerts';
+import ProfileModal from '../Shared/ProfileModal';
+
 
 interface UserPanelSettings {
     shopName: string;
@@ -14,9 +16,8 @@ interface UserPanelSettings {
 const getUserSettingsKey = (username: string) => `userPanelSettings_${username}`;
 
 const UserPanel: React.FC = () => {
-    const { rates, settings, currentUser, liveRates, logoutUser, lastUpdated, updateRates, updateTickerItems, tickerItems, historyLogs, updateMemberPassword } = useExchange();
+    const { rates, settings, currentUser, liveRates, logoutUser, lastUpdated, updateRates, updateTickerItems, tickerItems, historyLogs, members, updateMembers } = useExchange();
 
-    // Per-user settings from localStorage
     const loadUserSettings = (): UserPanelSettings => {
         if (!currentUser?.name) return {
             shopName: settings.shopName,
@@ -24,20 +25,25 @@ const UserPanel: React.FC = () => {
         };
         const key = getUserSettingsKey(currentUser.name);
         const saved = localStorage.getItem(key);
+        let savedScrollingText = settings.scrollingText;
         if (saved) {
-            try { return JSON.parse(saved); } catch { /* fall through */ }
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.scrollingText) savedScrollingText = parsed.scrollingText;
+            } catch { /* fall through */ }
         }
-        // Default dynamic shop name for logged-in user if no specific settings saved
+
+        // Use shopName from the database if available, otherwise fallback
         return {
-            shopName: `${currentUser.name.toUpperCase()} SARRAFİYE`,
-            scrollingText: settings.scrollingText,
+            shopName: currentUser.shopName || `${currentUser.name.toUpperCase()} SARRAFİYE`,
+            scrollingText: savedScrollingText,
         };
     };
 
     const [localRates, setLocalRates] = useState<Rate[]>(rates);
     const [hasChanges, setHasChanges] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [activeView, setActiveView] = useState<'dashboard' | 'settings' | 'history' | 'kar_hesaplama' | 'price_alerts'>('dashboard');
+    const [activeView, setActiveView] = useState<'dashboard' | 'settings' | 'history' | 'kar_hesaplama' | 'piyasa_canli'>('dashboard');
     const [userSettings, setUserSettings] = useState<UserPanelSettings>(loadUserSettings);
     const [localShopName, setLocalShopName] = useState(userSettings.shopName);
     const [localScrollingText, setLocalScrollingText] = useState(userSettings.scrollingText);
@@ -49,7 +55,7 @@ const UserPanel: React.FC = () => {
     const [lastMarketUpdate, setLastMarketUpdate] = useState<Date | null>(null);
 
     const fetchMarketData = useCallback(async () => {
-        if (activeView !== 'price_alerts') return;
+        if (activeView !== 'piyasa_canli') return;
 
         try {
             setMarketError(null);
@@ -94,13 +100,10 @@ const UserPanel: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchMarketData]);
 
+
+
     const [activeRightTab, setActiveRightTab] = useState<'currency' | 'ticker'>('currency');
-    const [showPasswordModal, setShowPasswordModal] = useState(false);
-    const [pwOld, setPwOld] = useState('');
-    const [pwNew, setPwNew] = useState('');
-    const [pwConfirm, setPwConfirm] = useState('');
-    const [pwError, setPwError] = useState<string | null>(null);
-    const [pwSaving, setPwSaving] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     useEffect(() => {
         setLocalRates(rates);
@@ -287,6 +290,15 @@ const UserPanel: React.FC = () => {
 
     const handleSaveSettings = () => {
         if (!currentUser?.name) return;
+
+        // Update user's shopName in DB
+        const updatedMembers = members.map(m => m.id === currentUser.id ? { ...m, shopName: localShopName } : m);
+        updateMembers(updatedMembers);
+
+        // Also update currentUser in localStorage so changes persist across refreshes
+        const updatedUser = { ...currentUser, shopName: localShopName };
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+
         const newSettings: UserPanelSettings = {
             shopName: localShopName,
             scrollingText: localScrollingText,
@@ -358,7 +370,7 @@ const UserPanel: React.FC = () => {
         'settings': '⚙️ Genel Ayarlar',
         'history': '📜 Geçmiş Listeleme',
         'kar_hesaplama': '🍀 Kar Hesaplama',
-        'price_alerts': '🔔 Fiyat Alarm Sistemi',
+        'piyasa_canli': '⚡ Piyasa Canlı',
     };
 
     const panelThStyle: React.CSSProperties = {
@@ -583,19 +595,19 @@ const UserPanel: React.FC = () => {
                                     <span>🍀</span> Kar Hesaplama
                                 </button>
                                 <button
-                                    onClick={() => { setActiveView('price_alerts'); setDropdownOpen(false); }}
+                                    onClick={() => { setActiveView('piyasa_canli'); setDropdownOpen(false); }}
                                     style={{
                                         ...dropdownItemStyle,
-                                        color: activeView === 'price_alerts' ? '#F5D56E' : '#C8D4E8',
-                                        background: activeView === 'price_alerts' ? 'rgba(212, 167, 49, 0.1)' : 'transparent',
+                                        color: activeView === 'piyasa_canli' ? '#F5D56E' : '#C8D4E8',
+                                        background: activeView === 'piyasa_canli' ? 'rgba(212, 167, 49, 0.1)' : 'transparent',
                                     }}
-                                    onMouseEnter={(e) => { if (activeView !== 'price_alerts') e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                                    onMouseLeave={(e) => { if (activeView !== 'price_alerts') e.currentTarget.style.background = 'transparent'; }}
+                                    onMouseEnter={(e) => { if (activeView !== 'piyasa_canli') e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                    onMouseLeave={(e) => { if (activeView !== 'piyasa_canli') e.currentTarget.style.background = 'transparent'; }}
                                 >
-                                    <span>🔔</span> Fiyat Alarmları
+                                    <span>⚡</span> Piyasa Canlı
                                 </button>
                                 <button
-                                    onClick={() => { setShowPasswordModal(true); setDropdownOpen(false); setPwOld(''); setPwNew(''); setPwConfirm(''); setPwError(null); }}
+                                    onClick={() => { setShowProfileModal(true); setDropdownOpen(false); }}
                                     style={{
                                         ...dropdownItemStyle,
                                         color: '#C8D4E8',
@@ -603,7 +615,7 @@ const UserPanel: React.FC = () => {
                                     onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
                                     onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                                 >
-                                    <span>🔑</span> Şifre Değiştir
+                                    <span>👤</span> Üye Bilgileri
                                 </button>
 
                                 <div style={{ height: '1px', background: 'rgba(212, 167, 49, 0.1)', margin: '6px 8px' }} />
@@ -1426,12 +1438,14 @@ const UserPanel: React.FC = () => {
                     </div>
                 )}
 
-                {/* ═══════════════════════════ PRICE ALERTS VIEW ═══════════════════════════ */}
-                {activeView === 'price_alerts' && (
+                {/* ═══════════════════════════ PIYASA CANLI VIEW ═══════════════════════════ */}
+                {activeView === 'piyasa_canli' && (
                     <div style={{ padding: '0 10px' }}>
                         <PriceAlerts marketData={marketData} lastUpdate={lastMarketUpdate} error={marketError} />
                     </div>
                 )}
+
+
 
                 {/* Footer */}
                 <div style={{
@@ -1443,129 +1457,8 @@ const UserPanel: React.FC = () => {
                 </div>
             </main>
 
-            {/* Password Change Modal */}
-            {
-                showPasswordModal && (
-                    <div
-                        onClick={() => setShowPasswordModal(false)}
-                        style={{
-                            position: 'fixed',
-                            inset: 0,
-                            background: 'rgba(0,0,0,0.6)',
-                            backdropFilter: 'blur(4px)',
-                            zIndex: 9999,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        <div
-                            onClick={e => e.stopPropagation()}
-                            style={{
-                                background: '#141a2e',
-                                border: '1px solid rgba(212, 167, 49, 0.25)',
-                                borderRadius: '16px',
-                                padding: '28px 32px',
-                                width: '340px',
-                                boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <span style={{ fontSize: '20px' }}>🔑</span>
-                                <h3 style={{ margin: 0, color: '#F5D56E', fontSize: '16px', fontWeight: 700 }}>Şifre Değiştir</h3>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <input
-                                    type="password"
-                                    placeholder="Eski Şifre"
-                                    value={pwOld}
-                                    onChange={e => { setPwOld(e.target.value); setPwError(null); }}
-                                    style={{
-                                        width: '100%', padding: '10px 14px', borderRadius: '10px', fontSize: '14px',
-                                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                                        color: '#C8D4E8', outline: 'none', boxSizing: 'border-box',
-                                    }}
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Yeni Şifre"
-                                    value={pwNew}
-                                    onChange={e => { setPwNew(e.target.value); setPwError(null); }}
-                                    style={{
-                                        width: '100%', padding: '10px 14px', borderRadius: '10px', fontSize: '14px',
-                                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                                        color: '#C8D4E8', outline: 'none', boxSizing: 'border-box',
-                                    }}
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Yeni Şifre (Tekrar)"
-                                    value={pwConfirm}
-                                    onChange={e => { setPwConfirm(e.target.value); setPwError(null); }}
-                                    style={{
-                                        width: '100%', padding: '10px 14px', borderRadius: '10px', fontSize: '14px',
-                                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                                        color: '#C8D4E8', outline: 'none', boxSizing: 'border-box',
-                                    }}
-                                />
-                            </div>
-
-                            {pwError && (
-                                <div style={{ fontSize: '12px', color: '#F87171', marginTop: '10px' }}>{pwError}</div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
-                                <button
-                                    disabled={pwSaving}
-                                    onClick={async () => {
-                                        if (!currentUser) return;
-                                        if (!pwOld) { setPwError('Eski şifre gerekli.'); return; }
-                                        if (pwOld !== currentUser.password) { setPwError('Eski şifre yanlış.'); return; }
-                                        if (!pwNew || pwNew.length < 3) { setPwError('Yeni şifre en az 3 karakter olmalı.'); return; }
-                                        if (pwNew !== pwConfirm) { setPwError('Yeni şifreler eşleşmiyor.'); return; }
-                                        if (pwNew === pwOld) { setPwError('Yeni şifre eski şifreyle aynı olamaz.'); return; }
-
-                                        setPwSaving(true);
-                                        const ok = await updateMemberPassword(currentUser.id, pwNew);
-                                        setPwSaving(false);
-
-                                        if (ok) {
-                                            setShowPasswordModal(false);
-                                            alert('Şifre başarıyla güncellendi!');
-                                        } else {
-                                            setPwError('Veritabanı hatası, tekrar deneyin.');
-                                        }
-                                    }}
-                                    style={{
-                                        flex: 1, padding: '10px',
-                                        background: 'linear-gradient(135deg, #4ADE80, #16A34A)',
-                                        border: 'none', borderRadius: '10px',
-                                        color: '#000', fontWeight: 700, fontSize: '13px',
-                                        cursor: pwSaving ? 'wait' : 'pointer',
-                                        opacity: pwSaving ? 0.6 : 1,
-                                    }}
-                                >
-                                    {pwSaving ? '...' : 'Kaydet'}
-                                </button>
-                                <button
-                                    onClick={() => setShowPasswordModal(false)}
-                                    style={{
-                                        flex: 1, padding: '10px',
-                                        background: 'rgba(90, 100, 128, 0.2)',
-                                        border: '1px solid rgba(90, 100, 128, 0.3)',
-                                        borderRadius: '10px',
-                                        color: '#9CA3AF', fontWeight: 600, fontSize: '13px',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    İptal
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            {/* User Profile Modal */}
+            <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
 
             {/* Announcements Popup */}
             {showAnnouncementsPopup && (

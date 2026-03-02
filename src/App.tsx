@@ -12,6 +12,7 @@ import InfoCarousel from './components/Display/InfoCarousel';
 import BottomBar from './components/Display/BottomBar';
 import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
+import Register from './components/Admin/Register';
 import UserPanel from './components/User/UserPanel';
 import './index.css';
 
@@ -27,18 +28,22 @@ const DisplayScreen: React.FC = () => {
   // Real-time presence tracking
   usePresence(currentUser);
 
-  // Load per-user settings if a user is logged in
   const getUserSettings = () => {
-    if (!currentUser?.name) return { shopName: settings.shopName, scrollingText: settings.scrollingText };
+    if (!currentUser?.name || currentUser.role === 'Admin') {
+      return { shopName: settings.shopName, scrollingText: settings.scrollingText };
+    }
     const key = `userPanelSettings_${currentUser.name}`;
     const saved = localStorage.getItem(key);
+    let savedScrollingText = settings.scrollingText;
     if (saved) {
-      try { return JSON.parse(saved); } catch { /* fall through */ }
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.scrollingText) savedScrollingText = parsed.scrollingText;
+      } catch { /* fall through */ }
     }
-    // Default dynamic shop name for logged-in user if no specific settings saved
     return {
-      shopName: `${currentUser.name.toUpperCase()} SARRAFİYE`,
-      scrollingText: settings.scrollingText
+      shopName: currentUser.shopName || `${currentUser.name.toUpperCase()} SARRAFİYE`,
+      scrollingText: savedScrollingText
     };
   };
 
@@ -305,6 +310,7 @@ function App() {
           <Routes>
             <Route path="/" element={<DisplayScreen />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/admin" element={
               <ProtectedRoute>
                 <Dashboard />
