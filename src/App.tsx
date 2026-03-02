@@ -17,7 +17,7 @@ import UserPanel from './components/User/UserPanel';
 import './index.css';
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const isAuthenticated = !!localStorage.getItem('currentUser');
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
