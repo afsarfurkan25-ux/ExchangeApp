@@ -1,0 +1,452 @@
+/* History.css - Transaction History Accordion Styles */
+
+.history-page {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.history-eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    color: #8a7020;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.history-eyebrow::before {
+    content: '';
+    width: 20px;
+    height: 1px;
+    background: #8a7020;
+}
+
+.history-title {
+    font-family: 'Cinzel', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: #D4AF37;
+    letter-spacing: 1px;
+}
+
+.history-sub {
+    font-size: 13px;
+    color: #475569;
+    margin-top: 6px;
+}
+
+/* Stats */
+.history-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+}
+
+.history-stat-chip {
+    background: #0c1019;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    animation: historyFadeUp 0.4s ease both;
+}
+
+.h-sc-icon {
+    font-size: 22px;
+}
+
+.h-sc-val {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.h-sc-label {
+    font-size: 11px;
+    color: #475569;
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+/* Filter Bar */
+.history-filter-bar {
+    background: #0c1019;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 16px 22px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    animation: historyFadeUp 0.4s ease 0.2s both;
+}
+
+.h-search-wrap {
+    position: relative;
+    flex: 2;
+    min-width: 200px;
+}
+
+.h-search-ic {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.h-search-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9px;
+    padding: 9px 12px 9px 34px;
+    color: #e2e8f0;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.h-search-input:focus {
+    border-color: rgba(212, 175, 55, 0.35);
+}
+
+.h-filter-sel,
+.h-filter-date {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9px;
+    padding: 9px 12px;
+    color: #94a3b8;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+    min-width: 140px;
+}
+
+.h-filter-sel option {
+    background: #1a2235;
+}
+
+/* Accordion */
+.accordion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.acc-card {
+    background: #0c1019;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color 0.25s, box-shadow 0.25s;
+    animation: historyFadeUp 0.4s ease both;
+}
+
+.acc-card:hover {
+    border-color: rgba(212, 175, 55, 0.15);
+}
+
+.acc-card.open {
+    border-color: rgba(212, 175, 55, 0.25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.acc-header {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.acc-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #D4AF37, #8a7020);
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.acc-card.open .acc-header::before {
+    opacity: 1;
+}
+
+.acc-left {
+    padding: 18px 20px 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+.acc-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: #D4AF37;
+    flex-shrink: 0;
+}
+
+.acc-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.acc-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: #e2e8f0;
+    margin-bottom: 3px;
+}
+
+.acc-source {
+    font-size: 11px;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.acc-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 20px 18px 16px;
+}
+
+.acc-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 100px;
+    white-space: nowrap;
+}
+
+.pill-altin {
+    background: rgba(212, 175, 55, 0.12);
+    color: #D4AF37;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.pill-doviz {
+    background: rgba(59, 130, 246, 0.12);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.pill-gumus {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.acc-count {
+    font-size: 22px;
+    font-weight: 700;
+    color: #D4AF37;
+    white-space: nowrap;
+}
+
+.acc-count-label {
+    font-size: 10px;
+    color: #475569;
+    margin-top: 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.acc-chevron {
+    width: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    align-self: stretch;
+}
+
+.acc-card.open .acc-chevron {
+    color: #D4AF37;
+}
+
+.acc-chevron svg {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.acc-card.open .acc-chevron svg {
+    transform: rotate(180deg);
+}
+
+/* Body */
+.acc-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.acc-card.open .acc-body {
+    max-height: 2000px;
+}
+
+.acc-body-inner {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.inner-head {
+    display: grid;
+    grid-template-columns: 2.5fr 1fr 1.8fr 1.8fr 80px;
+    padding: 10px 24px;
+    background: rgba(212, 175, 55, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ith {
+    font-size: 10px;
+    font-weight: 600;
+    color: #8a7020;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 0 6px;
+}
+
+.ith.tr {
+    text-align: right;
+}
+
+.ith.tc {
+    text-align: center;
+}
+
+.inner-row {
+    display: grid;
+    grid-template-columns: 2.5fr 1fr 1.8fr 1.8fr 80px;
+    padding: 11px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    align-items: center;
+}
+
+.inner-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.itd {
+    padding: 0 6px;
+    font-size: 13px;
+}
+
+.itd.tr {
+    text-align: right;
+}
+
+.itd.tc {
+    text-align: center;
+}
+
+.product-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.fiyat-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fiyat-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.fiyat-lbl {
+    font-size: 10px;
+    color: #475569;
+    font-weight: 500;
+    width: 10px;
+}
+
+.fiyat-val {
+    font-family: 'DM Mono', monospace;
+}
+
+.fiyat-eski {
+    color: #475569;
+}
+
+.fiyat-yeni {
+    font-weight: 600;
+}
+
+.degisim-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+}
+
+.acc-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 24px;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 11px;
+    color: #475569;
+}
+
+@keyframes historyFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
