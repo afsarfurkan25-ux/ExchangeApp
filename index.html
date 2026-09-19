@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/Kurmatiklogo_256.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Content Security Policy: güvenli bağlantılara izin ver, yabancı scriptleri engelle -->
+  <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self' 'unsafe-inline' 'unsafe-eval';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: blob: https:;
+      connect-src 'self'
+        http://localhost:5000
+        ws://localhost:5000
+        https://*.supabase.co
+        wss://*.supabase.co
+        https://finans.truncgil.com
+        https://open.er-api.com
+        https://www.goldapi.io;
+    " />
+  <title>Kurmatik Exchange</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
