@@ -13,8 +13,7 @@ dist-ssr
 *.local
 
 # Environment variables
-.env
-.env.*
+# .env files are intentionally included
 !.env.example
 
 # Editor directories and files
