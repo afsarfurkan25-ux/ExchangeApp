@@ -90,7 +90,12 @@ function isOnline(presence: any): boolean {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 const UserTracking: React.FC = () => {
-    const { members, activities, sessions } = useExchange();
+    const { members, activities, sessions, refreshTables } = useExchange();
+
+    // Kullanıcı takibi ekranı açıldığında yüklenir; pano ekranı bunları çekmez
+    useEffect(() => {
+        refreshTables(['members', 'user_sessions', 'activities']);
+    }, [refreshTables]);
     const [activeTab, setActiveTab] = useState<TabType>('online');
 
     // Presence

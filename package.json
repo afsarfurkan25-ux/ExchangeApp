@@ -6,28 +6,22 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:server": "esbuild server/index.js --bundle --platform=node --format=cjs --outdir=server/dist",
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build:server && vite build && electron-builder",
+    "electron:build": "vite build && electron-builder",
     "electron:preview": "vite build && electron .",
     "test": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
-    "axios": "^1.13.6",
-    "axios-retry": "^4.5.0",
     "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
     "dompurify": "^3.3.2",
     "dotenv": "^17.3.1",
     "electron-log": "^5.4.3",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.8.3",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.3.0",
     "lucide-react": "^0.575.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
@@ -71,19 +65,6 @@
     "directories": {
       "output": "build-release"
     },
-    "extraResources": [
-      {
-        "from": "server/dist",
-        "to": "server",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "server/.env",
-        "to": "server/.env"
-      }
-    ],
     "win": {
       "target": [
         {

@@ -12,6 +12,12 @@ export interface Rate {
     type: 'gold' | 'currency';
     change?: string; // Percentage change
     isVisible?: boolean; // New visibility toggle
+    isStale?: boolean; // Kaynak piyasa kapalıyken true (ingestion servisi işaretler)
+    liveSymbol?: string | null;   // Bu satırı besleyen canlı sembol (null = manuel)
+    isManual?: boolean;           // Satır kilidi: otomasyon dokunmaz
+    marginType?: 'percent' | 'amount' | null;
+    marginBuy?: number | null;   // Alış marjı: Alış = bid − marj
+    marginSell?: number | null;  // Satış marjı: Satış = ask + marj
 }
 
 export interface Settings {
@@ -43,6 +49,19 @@ export interface Member {
     status: 'Aktif' | 'Pasif';
     shopName?: string;
     email?: string;
+}
+
+/** Ingestion servisinin yazdığı ham piyasa kotası (marj uygulanmamış). */
+export interface LiveMarketRate {
+    symbol: string;
+    bid: number;
+    ask: number;
+    change_pct: number | null;
+    category: string | null;
+    source: string;
+    is_stale: boolean;
+    fetched_at: string;
+    updated_at: string;
 }
 
 export interface HistoryLog {
@@ -83,11 +102,19 @@ export interface Activity {
     created_at: string;
 }
 
+// Pano ekranı için zorunlu, açılışta yüklenen tablolar
+type CoreTable = 'settings' | 'rates' | 'ticker_items' | 'live_rates';
+
+// Yalnızca ilgili panel açıldığında yüklenen tablolar
+export type LazyTable = 'members' | 'history_logs' | 'user_sessions' | 'activities';
+
 export interface ExchangeContextType {
     rates: Rate[];
     tickerItems: TickerItem[];
     members: Member[];
     settings: Settings;
+    liveMarketRates: LiveMarketRate[];
+    updateRateMargin: (rateId: number, marginType: 'percent' | 'amount', marginBuy: number, marginSell: number) => Promise<boolean>;
     liveRates: {
         has: string;
         ons: string;
@@ -105,6 +132,8 @@ export interface ExchangeContextType {
     updateMemberPassword: (memberId: string, newPassword: string) => Promise<boolean>;
     updateCurrentMemberProfile: (updates: { name: string; email?: string; shopName?: string }) => Promise<boolean>;
     clearHistory: () => Promise<void>;
+    /** İlgili panel açıldığında ihtiyaç duyduğu tabloları yükler. */
+    refreshTables: (tables: LazyTable[]) => Promise<void>;
     authenticateUser: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: Member }>;
     logoutUser: () => Promise<void>;
     lastUpdated: Date;
@@ -148,27 +177,34 @@ const defaultTickerItems: TickerItem[] = [
     { id: 5, name: 'EUR/TRY', value: '51.8339', change: '-0.15%', isUp: false, isVisible: true },
 ];
 
-const defaultMembers: Member[] = [
-    { id: 'e87747e8-4673-4b68-8097-48f654032501', name: 'Admin User', username: 'admin', password: '1234', role: 'Admin', status: 'Aktif' },
-];
-
 export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [rates, setRates] = useState<Rate[]>(defaultRates);
     const [tickerItems, setTickerItems] = useState<TickerItem[]>(defaultTickerItems);
-    const [members, setMembers] = useState<Member[]>(defaultMembers);
+    // Üyeler yalnızca yönetim panelleri açıldığında yüklenir (refreshTables)
+    const [members, setMembers] = useState<Member[]>([]);
     const [settings, setSettings] = useState<Settings>(defaultSettings);
     const [historyLogs, setHistoryLogs] = useState<HistoryLog[]>([]);
+    const [liveMarketRates, setLiveMarketRates] = useState<LiveMarketRate[]>([]);
     const [sessions, setSessions] = useState<any[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
     const [currentUser, setCurrentUser] = useState<Member | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
-    const [liveRates, setLiveRates] = useState({
-        has: '—',
-        ons: '—',
-        hasChange: '0.00',
-        onsChange: '0.00'
-    });
+    // Alt şeritteki HAS/ONS değerleri artık live_rates tablosundan türetiliyor;
+    // eskiden localhost proxy üzerinden truncgil'e gidiliyordu.
+    const liveRates = useMemo(() => {
+        const pick = (symbol: string) => liveMarketRates.find(l => l.symbol === symbol);
+        const has = pick('HAS');
+        const ons = pick('ONS');
+        const fmt = (n: number | undefined) => (n === undefined ? '—' : n.toFixed(2));
+        const pct = (n: number | null | undefined) => (n === null || n === undefined ? '0.00' : n.toFixed(2));
+        return {
+            has: fmt(has?.ask),
+            ons: fmt(ons?.ask),
+            hasChange: pct(has?.change_pct),
+            onsChange: pct(ons?.change_pct),
+        };
+    }, [liveMarketRates]);
 
     // Offline status listeners
     useEffect(() => {
@@ -223,131 +259,146 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         checkSession();
     }, []);
 
-    // Initial Data Fetch from Supabase
-    useEffect(() => {
-        let mounted = true;
+    // ─── Veri Yükleme ────────────────────────────────────────────────────────
+    // Çekirdek tablolar (settings/rates/ticker_items) pano ekranının çalışması
+    // için şarttır; açılışta yüklenir ve realtime ile güncel tutulur.
+    // Diğerleri (üyeler, loglar, oturumlar, aktiviteler) yalnızca onları
+    // gösteren panel açıldığında refreshTables() ile çekilir.
 
-        const fetchInitialData = async (targetTable?: string) => {
-            try {
-                // Fetch Settings
-                if (!targetTable || targetTable === 'settings') {
-                    const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').single();
+    const fetchSettings = useCallback(async () => {
+        const { data, error } = await supabase.from('settings').select('*').single();
+        // PGRST116 = hiç kayıt yok; ilk kurulumda normal
+        if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching settings:', error);
+            return;
+        }
+        if (data) {
+            setSettings({
+                shopName: data.shop_name,
+                scrollingText: data.scrolling_text,
+                infoPanelText: data.info_panel_text,
+                isApiMode: data.is_api_mode,
+                margin: data.margin,
+                displayFontSize: data.display_font_size || 100
+            });
+        }
+    }, []);
 
-                    if (settingsError && settingsError.code !== 'PGRST116') {
-                        console.error('Error fetching settings:', settingsError);
-                    }
+    const fetchRates = useCallback(async () => {
+        const { data, error } = await supabase.from('rates').select('*').order('order_index');
+        if (error) { console.error('Error fetching rates:', error); return; }
+        if (data) {
+            setRates(data.map((r: any) => ({
+                id: r.id,
+                name: r.name,
+                buy: r.buy,
+                sell: r.sell,
+                type: r.type as 'gold' | 'currency',
+                change: r.change,
+                isVisible: r.is_visible !== false,
+                isStale: r.is_stale === true,
+                liveSymbol: r.live_symbol ?? null,
+                isManual: r.is_manual === true,
+                marginType: r.margin_type ?? null,
+                marginBuy: r.margin_buy ?? null,
+                marginSell: r.margin_sell ?? null,
+            })));
+        }
+    }, []);
 
-                    if (settingsData && mounted) {
-                        setSettings({
-                            shopName: settingsData.shop_name,
-                            scrollingText: settingsData.scrolling_text,
-                            infoPanelText: settingsData.info_panel_text,
-                            isApiMode: settingsData.is_api_mode,
-                            margin: settingsData.margin,
-                            displayFontSize: settingsData.display_font_size || 100
-                        });
-                    }
-                }
+    const fetchTickerItems = useCallback(async () => {
+        const { data, error } = await supabase.from('ticker_items').select('*').order('order_index');
+        if (error) { console.error('Error fetching ticker items:', error); return; }
+        if (data) {
+            setTickerItems(data.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                value: t.value,
+                change: t.change,
+                isUp: t.is_up,
+                isVisible: t.is_visible !== false,
+            })));
+        }
+    }, []);
 
-                // Fetch Rates
-                if (!targetTable || targetTable === 'rates') {
-                    const { data: ratesData, error: ratesError } = await supabase.from('rates').select('*').order('order_index');
-                    if (ratesError) console.error('Error fetching rates:', ratesError);
+    const fetchLiveMarketRates = useCallback(async () => {
+        const { data, error } = await supabase.from('live_rates').select('*');
+        if (error) {
+            // Tablo henüz kurulmadıysa (ingestion devreye alınmadan önce) sessiz geç
+            if (error.code !== '42P01') console.error('Error fetching live rates:', error);
+            return;
+        }
+        if (data) setLiveMarketRates(data as LiveMarketRate[]);
+    }, []);
 
-                    if (ratesData && mounted) {
-                        const mappedRates: Rate[] = ratesData.map((r: any) => ({
-                            id: r.id,
-                            name: r.name,
-                            buy: r.buy,
-                            sell: r.sell,
-                            type: r.type as 'gold' | 'currency',
-                            change: r.change,
-                            isVisible: r.is_visible !== false,
-                        }));
-                        setRates(mappedRates);
-                    }
-                }
+    const fetchMembers = useCallback(async () => {
+        const { data, error } = await supabase.from('members').select('*');
+        if (error) { console.error('Error fetching members:', error); return; }
+        if (data) setMembers(data.map((m: any) => ({ ...m, shopName: m.shop_name })) as Member[]);
+    }, []);
 
-                // Fetch Ticker Items
-                if (!targetTable || targetTable === 'ticker_items') {
-                    const { data: tickerData, error: tickerError } = await supabase.from('ticker_items').select('*').order('order_index');
-                    if (tickerError) console.error('Error fetching ticker items:', tickerError);
+    const fetchHistoryLogs = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('history_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        if (error) { console.error('Error fetching history:', error); return; }
+        if (data) setHistoryLogs(data as HistoryLog[]);
+    }, []);
 
-                    if (tickerData && mounted) {
-                        const mappedTickerItems: TickerItem[] = tickerData.map((t: any) => ({
-                            id: t.id,
-                            name: t.name,
-                            value: t.value,
-                            change: t.change,
-                            isUp: t.is_up,
-                            isVisible: t.is_visible !== false,
-                        }));
-                        setTickerItems(mappedTickerItems);
-                    }
-                }
+    const fetchSessions = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('user_sessions')
+            .select('*, members(name, role)')
+            .order('login_time', { ascending: false })
+            .limit(50);
+        if (error) { console.error('Error fetching sessions:', error); return; }
+        if (data) setSessions(data);
+    }, []);
 
-                // Fetch Members
-                if (!targetTable || targetTable === 'members') {
-                    const { data: membersData, error: membersError } = await supabase.from('members').select('*');
-                    if (membersError) console.error('Error fetching members:', membersError);
+    const fetchActivities = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('activities')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
+        if (error) { console.error('Error fetching activities:', error); return; }
+        if (data) setActivities(data);
+    }, []);
 
-                    if (membersData && mounted) {
-                        const mappedMembers = membersData.map((m: any) => ({
-                            ...m,
-                            shopName: m.shop_name
-                        }));
-                        setMembers(mappedMembers as Member[]);
-                    }
-                }
+    const refreshCore = useCallback(async (table?: CoreTable) => {
+        const jobs: Promise<void>[] = [];
+        if (!table || table === 'settings') jobs.push(fetchSettings());
+        if (!table || table === 'rates') jobs.push(fetchRates());
+        if (!table || table === 'ticker_items') jobs.push(fetchTickerItems());
+        if (!table || table === 'live_rates') jobs.push(fetchLiveMarketRates());
+        await Promise.all(jobs);
+    }, [fetchSettings, fetchRates, fetchTickerItems, fetchLiveMarketRates]);
 
-                // Fetch History Logs
-                if (!targetTable || targetTable === 'history_logs') {
-                    const { data: historyData, error: historyError } = await supabase.from('history_logs').select('*').order('created_at', { ascending: false }).limit(200);
-                    if (historyError) console.error('Error fetching history:', historyError);
-                    if (historyData && mounted) {
-                        setHistoryLogs(historyData as HistoryLog[]);
-                    }
-                }
-
-                // Fetch Sessions
-                if (!targetTable || targetTable === 'user_sessions') {
-                    const { data: sessionsData, error: sessionsError } = await supabase
-                        .from('user_sessions')
-                        .select('*, members(name, role)')
-                        .order('login_time', { ascending: false })
-                        .limit(50);
-                    if (sessionsError) console.error('Error fetching sessions:', sessionsError);
-                    if (sessionsData && mounted) {
-                        setSessions(sessionsData);
-                    }
-                }
-
-                // Fetch Activities
-                if (!targetTable || targetTable === 'activities') {
-                    const { data: activitiesData, error: activitiesError } = await supabase
-                        .from('activities')
-                        .select('*')
-                        .order('created_at', { ascending: false })
-                        .limit(100);
-                    if (activitiesError) console.error('Error fetching activities:', activitiesError);
-                    if (activitiesData && mounted) {
-                        setActivities(activitiesData);
-                    }
-                }
-            } catch (error) {
-                console.error('CRITICAL ERROR processing initial data:', error);
+    // Panellerin ihtiyaç duyduklarını açıkça istemesi için.
+    const refreshTables = useCallback(async (tables: LazyTable[]) => {
+        await Promise.all(tables.map((t) => {
+            switch (t) {
+                case 'members': return fetchMembers();
+                case 'history_logs': return fetchHistoryLogs();
+                case 'user_sessions': return fetchSessions();
+                case 'activities': return fetchActivities();
             }
-        };
+        }));
+    }, [fetchMembers, fetchHistoryLogs, fetchSessions, fetchActivities]);
 
-        // Load from electron-store if offline or as initial fallback
-        const loadFromStore = async () => {
+    useEffect(() => {
+        const init = async () => {
+            // Electron'da önce yerel önbellek, sonra ağ
             if (window.electronAPI) {
                 try {
-                    const savedRates = await window.electronAPI.storeGet('rates');
-                    const savedTicker = await window.electronAPI.storeGet('tickerItems');
-                    const savedSettings = await window.electronAPI.storeGet('settings');
-                    const savedLastUpdated = await window.electronAPI.storeGet('lastUpdated');
-
+                    const [savedRates, savedTicker, savedSettings, savedLastUpdated] = await Promise.all([
+                        window.electronAPI.storeGet('rates'),
+                        window.electronAPI.storeGet('tickerItems'),
+                        window.electronAPI.storeGet('settings'),
+                        window.electronAPI.storeGet('lastUpdated'),
+                    ]);
                     if (savedRates) setRates(savedRates);
                     if (savedTicker) setTickerItems(savedTicker);
                     if (savedSettings) setSettings(savedSettings);
@@ -356,68 +407,39 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
                     console.error('Error loading from store:', e);
                 }
             }
-        };
-
-        const refreshData = async (targetTable?: string) => {
-            if (!mounted) return;
-            await fetchInitialData(targetTable);
-
-            // Save to store after refresh if in Electron
-            if (window.electronAPI) {
-                // We don't have direct access to the state here easily without 
-                // making fetchInitialData return values, but fetchInitialData 
-                // already calls setRates etc. which triggers the store save 
-                // in the component's render cycle if we moved it there.
-                // However, let's just make fetchInitialData more robust.
-            }
-        };
-
-        const init = async () => {
-            await loadFromStore(); // First load from cache
-            refreshData(); // Then try to fetch fresh data
+            refreshCore();
         };
 
         init();
 
-        // Realtime & Broadcast Subscription
-        const channel = supabase.channel('exchange-app-changes')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public' },
-                (payload) => {
-                    console.log(`DB Change received for table: ${payload.table}`, payload);
-                    refreshData(payload.table);
-                }
-            )
-            .on(
-                'broadcast',
-                { event: 'data-update' },
-                (payload) => {
-                    console.log('Broadcast received:', payload);
-                    refreshData();
-                }
-            )
+        // Realtime yalnızca çekirdek tablolarda. Önceden tüm public şeması
+        // dinleniyordu; her presence ping'i bütün istemcilere yayılıyordu.
+        const realtimeOk = { current: false };
+
+        const channel = supabase.channel('exchange-core')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => refreshCore('settings'))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'rates' }, () => refreshCore('rates'))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'ticker_items' }, () => refreshCore('ticker_items'))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'live_rates' }, () => refreshCore('live_rates'))
+            .on('broadcast', { event: 'data-update' }, () => refreshCore())
             .subscribe((status) => {
-                console.log('Supabase Subscription Status:', status);
-                if (status === 'SUBSCRIBED') {
-                    console.log('Listening for DB changes and broadcasts...');
-                }
+                realtimeOk.current = status === 'SUBSCRIBED';
+                if (status !== 'SUBSCRIBED') console.warn('Supabase realtime durumu:', status);
             });
 
-        // Polling Fallback (Every 30 seconds)
+        // Yalnızca realtime kopuksa devreye giren yedek yoklama.
         const pollInterval = setInterval(() => {
-            if (navigator.onLine) {
-                console.log('Polling for fresh data...');
-                refreshData();
+            if (!realtimeOk.current && navigator.onLine) {
+                console.warn('Realtime bağlantısı yok, çekirdek veriler yoklanıyor...');
+                refreshCore();
             }
-        }, 30000);
+        }, 60000);
 
         return () => {
-            mounted = false;
             supabase.removeChannel(channel);
             clearInterval(pollInterval);
         };
-    }, []);
+    }, [refreshCore]);
 
     // Handle Tab Close / Browser Close
     useEffect(() => {
@@ -452,64 +474,6 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 
     // Live Rates from backend proxy (finans.truncgil.com via localhost:5000)
-    useEffect(() => {
-        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const fetchLiveRates = async () => {
-            try {
-                // Try backend proxy first
-                let data;
-                try {
-                    const response = await fetch(`${API_BASE}/api/live-rates`);
-                    if (response.ok) {
-                        data = await response.json();
-                    }
-                } catch (e) {
-                    console.warn('Backend proxy unavailable for live rates, trying direct...');
-                }
-
-                // Fallback to direct API if backend is down
-                if (!data) {
-                    const response = await fetch('https://finans.truncgil.com/v4/today.json');
-                    const raw = await response.json();
-                    if (raw) {
-                        const hasVal = raw.HAS?.Selling;
-                        const hasChange = raw.HAS?.Change || '0.00';
-                        let onsVal = raw.ONS?.Selling;
-                        let onsChange = raw.ONS?.Change || '0.00';
-                        const usdVal = raw.USD?.Selling;
-
-                        if ((!onsVal || onsVal == 0) && hasVal && usdVal) {
-                            onsVal = (parseFloat(hasVal) * 31.1035) / parseFloat(usdVal);
-                            onsChange = '0.00';
-                        }
-
-                        data = {
-                            has: hasVal ? parseFloat(hasVal).toFixed(2) : '—',
-                            ons: onsVal ? parseFloat(onsVal).toFixed(2) : '—',
-                            hasChange: hasChange.toString(),
-                            onsChange: onsChange.toString()
-                        };
-                    }
-                }
-
-                if (data) {
-                    setLiveRates({
-                        has: data.has || '—',
-                        ons: data.ons || '—',
-                        hasChange: data.hasChange || '0.00',
-                        onsChange: data.onsChange || '0.00'
-                    });
-                }
-            } catch (error) {
-                console.error('Error fetching live rates:', error);
-            }
-        };
-
-        fetchLiveRates();
-        const interval = setInterval(fetchLiveRates, 10000); // 10s update
-        return () => clearInterval(interval);
-    }, []);
-
     const updateSettings = useCallback(async (newSettings: Settings) => {
         setSettings(newSettings);
         if (window.electronAPI) {
@@ -813,11 +777,66 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, []);
 
+    /**
+     * Bir kur satırının marjını günceller. Yalnızca Admin/Yönetici.
+     * Değeri ingestion servisi bir sonraki turunda (varsayılan 5 sn) uygular;
+     * marjlı fiyat rates tablosundan realtime ile geri gelir.
+     */
+    const updateRateMargin = useCallback(async (
+        rateId: number,
+        marginType: 'percent' | 'amount',
+        marginBuy: number,
+        marginSell: number
+    ): Promise<boolean> => {
+        if (currentUser?.role !== 'Admin' && currentUser?.role !== 'Yönetici') {
+            console.warn('Marj değiştirme yetkisi yok.');
+            return false;
+        }
+        // Negatif değere izin var: marjı ters yöne kaydırmak isteyen olabilir
+        // (alış marjı -10 => bid + 10). Sadece sayı olmasını şart koşuyoruz.
+        if (!Number.isFinite(marginBuy) || !Number.isFinite(marginSell)) {
+            console.warn('Marj sayısal olmalı.');
+            return false;
+        }
+
+        const { error } = await supabase
+            .from('rates')
+            .update({ margin_type: marginType, margin_buy: marginBuy, margin_sell: marginSell })
+            .eq('id', rateId);
+
+        if (error) {
+            console.error('Marj güncellenemedi:', error);
+            return false;
+        }
+
+        setRates(prev => prev.map(r =>
+            r.id === rateId ? { ...r, marginType, marginBuy, marginSell } : r
+        ));
+        return true;
+    }, [currentUser]);
+
     const authenticateUser = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string; user?: Member }> => {
-        const member = members.find(m => m.username === username || m.email === username);
-        if (!member) {
+        // Üye listesi artık önden indirilmiyor; yalnızca giriş yapan kişinin
+        // kaydı sorgulanır. .eq() değeri kaçışlar, PostgREST filtresine
+        // kullanıcı girdisi enjekte edilemez.
+        const lookup = async (column: 'username' | 'email') => {
+            const { data, error } = await supabase
+                .from('members')
+                .select('*')
+                .eq(column, username)
+                .limit(1);
+            if (error) {
+                console.error(`Error looking up member by ${column}:`, error);
+                return null;
+            }
+            return data?.[0] ?? null;
+        };
+
+        const row = (await lookup('username')) ?? (await lookup('email'));
+        if (!row) {
             return { success: false, error: 'Kullanıcı bulunamadı!' };
         }
+        const member: Member = { ...row, shopName: row.shop_name };
         if (member.status === 'Pasif') {
             return { success: false, error: 'Hesabınız pasif durumdadır. Yöneticinizle iletişime geçin.' };
         }
@@ -900,7 +919,7 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
 
         return { success: true, user: member };
-    }, [members]);
+    }, []);
 
     const logoutUser = useCallback(async () => {
         if (currentUser) {
@@ -936,12 +955,15 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateMemberPassword,
         updateCurrentMemberProfile,
         clearHistory,
+        refreshTables,
+        liveMarketRates,
+        updateRateMargin,
         authenticateUser,
         logoutUser,
         lastUpdated,
         isOffline,
         isAuthChecking
-    }), [rates, tickerItems, members, settings, liveRates, historyLogs, sessions, activities, currentUser, lastUpdated, isOffline, isAuthChecking, updateSettings, updateRates, updateTickerItems, updateMembers, updateMemberPassword, updateCurrentMemberProfile, clearHistory, authenticateUser, logoutUser]);
+    }), [rates, tickerItems, members, settings, liveRates, historyLogs, sessions, activities, currentUser, lastUpdated, isOffline, isAuthChecking, updateSettings, updateRates, updateTickerItems, updateMembers, updateMemberPassword, updateCurrentMemberProfile, clearHistory, refreshTables, liveMarketRates, updateRateMargin, authenticateUser, logoutUser]);
 
     return (
         <ExchangeContext.Provider value={contextValue}>

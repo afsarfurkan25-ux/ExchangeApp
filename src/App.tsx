@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ExchangeProvider, ExchangeContext } from './context/ExchangeContext';
+import type { UserRole } from './context/ExchangeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationOverlay from './components/Shared/NotificationOverlay';
 import { useExchange } from './hooks/useExchange';
@@ -14,14 +15,27 @@ import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
 import Register from './components/Admin/Register';
 import UserPanel from './components/User/UserPanel';
+import AccessDenied from './components/Shared/AccessDenied';
 import './index.css';
 
-const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
+/**
+ * Rota koruması.
+ *
+ * `roles` verilirse sayfa yalnızca o rollere açılır; yetkisiz kullanıcıya
+ * 403 gösterilir ve korunan bileşen HİÇ render edilmez — dolayısıyla o
+ * sayfanın veri çağrıları da hiç çalışmaz.
+ *
+ * NOT: Bu bir arayüz koruması. Asıl güvenlik sınırı veritabanındaki RLS
+ * politikalarıdır; anon anahtar tarayıcıda görünür olduğu için sayfayı
+ * gizlemek veriyi korumaz.
+ */
+const ProtectedRoute = ({ children, roles }: { children: React.ReactElement; roles?: UserRole[] }) => {
   const context = React.useContext(ExchangeContext);
 
+  // Provider tüm uygulamayı sarıyor; context yoksa güvenli tarafta kal.
+  // (Eskiden burada localStorage'a bakılıp içeri alınıyordu — taklit edilebilir.)
   if (!context) {
-    const isAuthenticated = !!localStorage.getItem('currentUser');
-    return isAuthenticated ? children : <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   const { currentUser, isAuthChecking } = context;
@@ -34,7 +48,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     );
   }
 
-  return currentUser ? children : <Navigate to="/login" replace />;
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (roles && !roles.includes(currentUser.role)) {
+    return <AccessDenied role={currentUser.role} />;
+  }
+
+  return children;
 };
 
 const DisplayScreen: React.FC = () => {
@@ -343,8 +365,9 @@ function App() {
             <Route path="/" element={<DisplayScreen />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            {/* Yönetim paneli yalnızca Admin ve Yönetici rollerine açık */}
             <Route path="/admin" element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={['Admin', 'Yönetici']}>
                 <Dashboard />
               </ProtectedRoute>
             } />

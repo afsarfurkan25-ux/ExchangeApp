@@ -32,7 +32,9 @@ const Login: React.FC = () => {
         const result = await authenticateUser(username.trim(), password);
 
         if (result.success && result.user) {
-            if (result.user.role === 'Admin') {
+            // Yönetim paneline erişimi olan roller oraya, diğerleri kendi paneline.
+            // Rota koruması (App.tsx) ile aynı rol listesi kullanılmalı.
+            if (result.user.role === 'Admin' || result.user.role === 'Yönetici') {
                 navigate('/admin');
             } else {
                 navigate('/panel');

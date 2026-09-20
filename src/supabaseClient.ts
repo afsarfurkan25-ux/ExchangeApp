@@ -4,10 +4,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.warn('Supabase URL or Key is missing! Please check your .env file.');
+    throw new Error(
+        'Supabase yapılandırması eksik. Proje kökündeki .env dosyasına VITE_SUPABASE_URL ve ' +
+        'VITE_SUPABASE_ANON_KEY değerlerini ekleyip dev sunucusunu yeniden başlatın. ' +
+        '(.env yalnızca açılışta okunur, kaydetmek tek başına yetmez.)'
+    );
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://dummy-project.supabase.co',
-  supabaseKey || 'dummy-key'
-);
+// Sondaki eğik çizgi supabase-js'in ürettiği adresleri bozar (".../co//rest/v1")
+const normalizedUrl = supabaseUrl.replace(/\/+$/, '');
+
+export const supabase = createClient(normalizedUrl, supabaseKey);

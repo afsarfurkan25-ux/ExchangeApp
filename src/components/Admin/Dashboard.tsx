@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useExchange } from '../../hooks/useExchange';
 import type { TickerItem, HistoryLog, Rate, Member } from '../../context/ExchangeContext';
@@ -6,6 +6,7 @@ import UserTracking from './UserTracking';
 import KarHesaplama from './KarHesaplama';
 import Announcements from './Announcements';
 import PriceAlerts from './PriceAlerts';
+import LiveMarketMargins from './LiveMarketMargins';
 import NotificationBell from '../Shared/NotificationBell';
 import ProfileModal from '../Shared/ProfileModal';
 
@@ -21,7 +22,7 @@ import RateManagement from './RateManagement';
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const context = useExchange();
-    const { settings, updateSettings, rates, updateRates, tickerItems, updateTickerItems, members, updateMembers, updateMemberPassword, historyLogs, clearHistory, logoutUser, currentUser } = context;
+    const { settings, updateSettings, rates, updateRates, tickerItems, updateTickerItems, members, updateMembers, updateMemberPassword, historyLogs, clearHistory, logoutUser, currentUser, refreshTables, liveMarketRates } = context;
 
     const [localShopName, setLocalShopName] = useState(settings.shopName);
     const [localTicker, setLocalTicker] = useState(settings.scrollingText);
@@ -79,12 +80,9 @@ const Dashboard: React.FC = () => {
 
     const [localFontSize, setLocalFontSize] = useState(settings.displayFontSize || 100);
 
-    const [error, setError] = useState<string | null>(null);
+    const error: string | null = null; // proxy kaldırıldı, hata kaynağı yok
 
-    const [lastHomeUpdate, setLastHomeUpdate] = useState<Date | null>(null);
 
-    // Live Market Data State
-    const [marketData, setMarketData] = useState<any>({});
 
     // Save Popup State
     const [showSavePopup, setShowSavePopup] = useState(false);
@@ -148,55 +146,16 @@ const Dashboard: React.FC = () => {
     };
 
 
-    // Fetch Backend Data
-    const fetchMarketData = useCallback(async () => {
-        if (activeTab !== 'home') return;
+    // Piyasa verisi artık live_rates tablosundan realtime geliyor;
+    // eskiden localhost proxy'sine üç ayrı istek atılıyordu.
+    const lastHomeUpdate = liveMarketRates.length > 0
+        ? new Date(Math.max(...liveMarketRates.map(l => new Date(l.updated_at).getTime())))
+        : null;
 
-        try {
-            setError(null);
-            // Promise.all to fetch all data
-            // We verify response.ok to ensure 200 OK
-            const fetchAPI = async (endpoint: string) => {
-                try {
-                    const res = await fetch(endpoint);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return await res.json();
-                } catch (e) {
-                    console.error(`Fetch ${endpoint} failed:`, e);
-                    return null;
-                }
-            };
-
-            const [currency, gold, silver] = await Promise.all([
-                fetchAPI(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/currency`),
-                fetchAPI(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/gold`),
-                fetchAPI(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/silver`)
-            ]);
-
-            // Check if we got ANY data. If all null, likely backend down.
-            if (!currency && !gold && !silver) {
-                setError('Backend sunucusuna bağlanılamadı. Lütfen start_app.bat dosyasını çalıştırdığınızdan emin olun.');
-                return;
-            }
-
-            setMarketData({
-                currency: currency?.rates || {},
-                gold: gold || {},
-                silver: silver || {}
-            });
-            setLastHomeUpdate(new Date());
-
-        } catch (error) {
-            console.error('Market API Error:', error);
-            setError('Veri çekme hatası oluştu.');
-        }
-    }, [activeTab]);
-
+    // Yönetim panelinin ihtiyaç duyduğu tablolar; yalnızca panel açıldığında
     useEffect(() => {
-        fetchMarketData();
-        const interval = setInterval(fetchMarketData, 30000);
-        return () => clearInterval(interval);
-    }, [fetchMarketData]);
+        refreshTables(['members', 'history_logs']);
+    }, [refreshTables]);
 
     // Sync local members with context
     useEffect(() => {
@@ -259,7 +218,12 @@ const Dashboard: React.FC = () => {
     }, [historyLogs, historySearch, historyTypeFilter, historySourceFilter, historyDateFilter]);
 
     const renderHome = () => {
-        return <PriceAlerts marketData={marketData} lastUpdate={lastHomeUpdate} error={error} />;
+        return (
+            <>
+                <LiveMarketMargins />
+                <PriceAlerts liveRates={liveMarketRates} lastUpdate={lastHomeUpdate} error={error} />
+            </>
+        );
     };
 
 

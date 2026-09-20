@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useExchange } from '../../hooks/useExchange';
 import type { Rate } from '../../context/ExchangeContext';
 import KarHesaplama from '../Admin/KarHesaplama';
@@ -19,7 +19,7 @@ const getUserSettingsKey = (username: string) => `userPanelSettings_${username}`
 
 const UserPanel: React.FC = () => {
     const navigate = useNavigate();
-    const { rates, settings, currentUser, liveRates, logoutUser, lastUpdated, updateRates, updateTickerItems, tickerItems, historyLogs, members, updateMembers } = useExchange();
+    const { rates, settings, currentUser, liveRates, logoutUser, lastUpdated, updateRates, updateTickerItems, tickerItems, historyLogs, updateCurrentMemberProfile, refreshTables, liveMarketRates } = useExchange();
 
     const loadUserSettings = (): UserPanelSettings => {
         if (!currentUser?.name) return {
@@ -53,55 +53,11 @@ const UserPanel: React.FC = () => {
     const [localTickerItems, setLocalTickerItems] = useState(tickerItems);
     const [showAnnouncementsPopup, setShowAnnouncementsPopup] = useState(false);
 
-    const [marketData, setMarketData] = useState<any>({});
-    const [marketError, setMarketError] = useState<string | null>(null);
-    const [lastMarketUpdate, setLastMarketUpdate] = useState<Date | null>(null);
 
-    const fetchMarketData = useCallback(async () => {
-        if (activeView !== 'piyasa_canli') return;
-
-        try {
-            setMarketError(null);
-            const fetchAPI = async (endpoint: string) => {
-                try {
-                    const res = await fetch(endpoint);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return await res.json();
-                } catch (e) {
-                    console.error(`Fetch ${endpoint} failed:`, e);
-                    return null;
-                }
-            };
-
-            const [currency, gold, silver] = await Promise.all([
-                fetchAPI(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/currency`),
-                fetchAPI(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/gold`),
-                fetchAPI(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/silver`)
-            ]);
-
-            if (!currency && !gold && !silver) {
-                setMarketError('Backend sunucusuna bağlanılamadı. Lütfen start_app.bat dosyasını çalıştırdığıza emin olun.');
-                return;
-            }
-
-            setMarketData({
-                currency: currency?.rates || {},
-                gold: gold || {},
-                silver: silver || {}
-            });
-            setLastMarketUpdate(new Date());
-
-        } catch (error) {
-            console.error('Market API Error:', error);
-            setMarketError('Veri çekme hatası oluştu.');
-        }
-    }, [activeView]);
-
-    useEffect(() => {
-        fetchMarketData();
-        const interval = setInterval(fetchMarketData, 30000);
-        return () => clearInterval(interval);
-    }, [fetchMarketData]);
+    // Piyasa verisi live_rates tablosundan realtime geliyor
+    const lastMarketUpdate = liveMarketRates.length > 0
+        ? new Date(Math.max(...liveMarketRates.map(l => new Date(l.updated_at).getTime())))
+        : null;
 
 
 
@@ -113,6 +69,11 @@ const UserPanel: React.FC = () => {
         setLocalTickerItems(tickerItems);
         setHasChanges(false);
     }, [rates, tickerItems]);
+
+    // Bu panelin ihtiyaç duyduğu tek ek tablo: işlem geçmişi
+    useEffect(() => {
+        refreshTables(['history_logs']);
+    }, [refreshTables]);
 
     // Load user-specific settings when user changes
     useEffect(() => {
@@ -294,13 +255,14 @@ const UserPanel: React.FC = () => {
     const handleSaveSettings = () => {
         if (!currentUser?.name) return;
 
-        // Update user's shopName in DB
-        const updatedMembers = members.map(m => m.id === currentUser.id ? { ...m, shopName: localShopName } : m);
-        updateMembers(updatedMembers);
-
-        // Also update currentUser in localStorage so changes persist across refreshes
-        const updatedUser = { ...currentUser, shopName: localShopName };
-        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        // Yalnızca giriş yapan kullanıcının kaydını günceller. Eskiden tüm üye
+        // listesi indirilip geri yazılıyordu; artık gerek yok. Bu fonksiyon
+        // currentUser'ı ve localStorage'ı da kendisi tazeliyor.
+        updateCurrentMemberProfile({
+            name: currentUser.name,
+            email: currentUser.email,
+            shopName: localShopName,
+        });
 
         const newSettings: UserPanelSettings = {
             shopName: localShopName,
@@ -1457,7 +1419,7 @@ const UserPanel: React.FC = () => {
                 {/* ═══════════════════════════ PIYASA CANLI VIEW ═══════════════════════════ */}
                 {activeView === 'piyasa_canli' && (
                     <div style={{ padding: '0 10px' }}>
-                        <PriceAlerts marketData={marketData} lastUpdate={lastMarketUpdate} error={marketError} />
+                        <PriceAlerts liveRates={liveMarketRates} lastUpdate={lastMarketUpdate} error={null} />
                     </div>
                 )}
 

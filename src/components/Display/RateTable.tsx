@@ -83,6 +83,17 @@ const RateTable: React.FC<RateTableProps> = ({ rates }) => {
     const goldRates = rates.filter(r => r.type === 'gold' && r.isVisible !== false);
     const currencyRates = rates.filter(r => r.type === 'currency' && r.isVisible !== false);
 
+    // Otomatik beslenen satırların bayatlık durumu. isStale taşımayan satırlar
+    // (tamamen manuel girilenler) bu hesaba katılmaz.
+    const tracked = rates.filter(r => r.isStale !== undefined);
+    const staleCount = tracked.filter(r => r.isStale).length;
+    const liveStatus =
+        tracked.length === 0 ? { label: 'MANUEL', color: '#8B97B8', blink: false }
+        : staleCount === tracked.length ? { label: 'PİYASA KAPALI', color: '#F59E0B', blink: false }
+        : staleCount > 0 ? { label: 'KISMİ GECİKME', color: '#F59E0B', blink: true }
+        : { label: 'CANLI', color: '#22C55E', blink: true };
+
+
     return (
         <div className="rate-table-wrapper" style={{
             flex: 1,
@@ -112,22 +123,24 @@ const RateTable: React.FC<RateTableProps> = ({ rates }) => {
                 }}>
                     ÜRÜN LİSTESİ
                 </div>
+                {/* Rozet gerçek duruma bağlı. Bayat fiyatı "CANLI" diye
+                    göstermek bir fiyat panosunda kabul edilemez. */}
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: '#22C55E'
+                    color: liveStatus.color
                 }}>
                     <span style={{
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
-                        background: '#22C55E',
-                        animation: 'blink 1.5s ease infinite'
+                        background: liveStatus.color,
+                        animation: liveStatus.blink ? 'blink 1.5s ease infinite' : 'none'
                     }}></span>
-                    <span>CANLI</span>
+                    <span>{liveStatus.label}</span>
                 </div>
             </div>
 

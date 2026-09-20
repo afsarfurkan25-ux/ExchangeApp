@@ -1,6 +1,5 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, powerSaveBlocker, session } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
 const log = require('electron-log');
 
 // ─── EARLY LOGGING ─────────────────────────────────────────────────────────
@@ -20,61 +19,7 @@ process.on('uncaughtException', (error) => {
 const isDev = !app.isPackaged;
 const { setupAutoUpdater } = require('./updater');
 
-let serverProcess = null;
 let Store;
-
-function startBackendServer() {
-    const serverDir = isDev
-        ? path.join(__dirname, '../server')
-        : path.join(process.resourcesPath, 'server');
-
-    log.info('Attempting to start backend server from:', serverDir);
-
-    const fs = require('fs');
-    if (!fs.existsSync(serverDir)) {
-        log.error('CRITICAL: Server directory does not exist!', serverDir);
-        return;
-    }
-
-    // In production, node_modules are now pre-bundled.
-    // No more runtime npm install to avoid administrator permission requirements.
-
-    // Spawn the server using the system 'node' binary
-    const nodeCmd = process.platform === 'win32' ? 'node.exe' : 'node';
-    log.info('Spawning server with command:', nodeCmd, 'in', serverDir);
-
-    serverProcess = spawn(nodeCmd, ['index.js'], {
-        cwd: serverDir,
-        env: { ...process.env, PORT: '5000' },
-        stdio: 'pipe',
-        shell: true,
-    });
-
-    serverProcess.stdout.on('data', (data) => {
-        log.info('[Server]', data.toString().trim());
-    });
-
-    serverProcess.stderr.on('data', (data) => {
-        log.warn('[Server Error]', data.toString().trim());
-    });
-
-    serverProcess.on('close', (code) => {
-        log.info(`Backend server exited with code ${code}`);
-        serverProcess = null;
-    });
-
-    serverProcess.on('error', (err) => {
-        log.error('Failed to start backend server child process:', err.message);
-    });
-}
-
-function stopBackendServer() {
-    if (serverProcess) {
-        serverProcess.kill();
-        serverProcess = null;
-        log.info('Backend server stopped.');
-    }
-}
 
 // Store initialization
 (async () => {
@@ -234,14 +179,6 @@ app.whenReady().then(async () => {
         });
     });
 
-    // Auto-start backend server (replaces start_app.bat)
-    startBackendServer();
-
-    // Give server 1.5s to bind to port 5000 before window loads
-    if (!isDev) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-
     createWindow();
     createTray();
 
@@ -272,9 +209,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-    // Stop backend server on quit
-    stopBackendServer();
-
     // Final cleanup on quit
     if (blockerId !== undefined && powerSaveBlocker.isStarted(blockerId)) {
         powerSaveBlocker.stop(blockerId);

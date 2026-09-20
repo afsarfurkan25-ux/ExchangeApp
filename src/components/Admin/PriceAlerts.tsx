@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './PriceAlerts.css';
+import type { LiveMarketRate } from '../../context/ExchangeContext';
 
 interface PriceAlertsProps {
-    marketData: {
-        currency: any;
-        gold: any;
-        silver: any;
-    };
+    /** Ingestion servisinin yazdığı ham piyasa kotaları (live_rates tablosu). */
+    liveRates: LiveMarketRate[];
     lastUpdate: Date | null;
     error?: string | null;
 }
@@ -40,7 +38,7 @@ interface ProductInfo {
     change: number;
 }
 
-const PriceAlerts: React.FC<PriceAlertsProps> = ({ marketData, lastUpdate, error }) => {
+const PriceAlerts: React.FC<PriceAlertsProps> = ({ liveRates, lastUpdate, error }) => {
     // State
     const [prices, setPrices] = useState<{ [key: string]: ProductInfo }>({});
     const [alarms, setAlarms] = useState<Alarm[]>([]);
@@ -91,65 +89,50 @@ const PriceAlerts: React.FC<PriceAlertsProps> = ({ marketData, lastUpdate, error
 
     // Process Market Data
     useEffect(() => {
-        if (!marketData.currency || !marketData.gold) return;
+        if (liveRates.length === 0) return;
 
-        const safeNum = (val: any): number => {
-            const n = typeof val === 'number' ? val : parseFloat(val);
-            return isNaN(n) || !isFinite(n) ? 0 : n;
+        const bySymbol = new Map(liveRates.map(l => [l.symbol, l]));
+        // Satış (ask) tarafını izliyoruz; panoda öne çıkan taraf bu.
+        const px = (symbol: string): number | null => {
+            const q = bySymbol.get(symbol);
+            return q && Number.isFinite(q.ask) ? q.ask : null;
         };
 
-        const getRate = (code: string) => {
-            const rate = marketData.currency[code];
-            return rate ? (1 / rate) : 0;
-        };
+        const hasGram = px('HAS');
 
-        const usdTry = safeNum(getRate('USD'));
-        const eurTry = safeNum(getRate('EUR'));
-        const gbpTry = safeNum(getRate('GBP'));
-
-        let xauTry = safeNum(marketData.gold.price || 0);
-        if (marketData.gold.currency === 'USD') {
-            xauTry = xauTry * usdTry;
-        }
-
-        let xagTry = safeNum(marketData.silver?.price || 0);
-        if (marketData.silver?.currency === 'USD') {
-            xagTry = xagTry * usdTry;
-        }
-
-        const hasGram = safeNum(xauTry / 31.1034768);
-        const silverGram = safeNum(xagTry / 31.1034768);
-
-        const definitions = [
-            { key: 'HAS_GRAM', name: '24 Ayar (Has) Gram', cat: 'Altın', val: safeNum(hasGram) },
-            { key: '22_AYAR', name: '22 Ayar Bilezik', cat: 'Altın', val: safeNum(hasGram * 0.916) },
-            { key: '18_AYAR', name: '18 Ayar', cat: 'Altın', val: safeNum(hasGram * 0.750) },
-            { key: '14_AYAR', name: '14 Ayar', cat: 'Altın', val: safeNum(hasGram * 0.585) },
-            { key: 'GRAM_ALTIN', name: 'Gram Altın', cat: 'Altın', val: safeNum(hasGram * 0.995) },
-            { key: 'CEYREK', name: 'Çeyrek Altın', cat: 'Altın', val: safeNum(hasGram * 1.754 * 0.916) },
-            { key: 'YARIM', name: 'Yarım Altın', cat: 'Altın', val: safeNum(hasGram * 3.508 * 0.916) },
-            { key: 'TAM', name: 'Tam Altın', cat: 'Altın', val: safeNum(hasGram * 7.016 * 0.916) },
-            { key: 'CUMHURIYET', name: 'Cumhuriyet Altını', cat: 'Altın', val: safeNum(hasGram * 7.216 * 0.916) },
-            { key: 'ATA', name: 'Ata Altın', cat: 'Altın', val: safeNum(hasGram * 7.216) },
-            { key: 'GREMSE', name: 'Gremse (2.5)', cat: 'Altın', val: safeNum(hasGram * 1.754 * 0.916 * 10) },
-            { key: 'GUMUS', name: 'Gümüş (Gram)', cat: 'Gümüş', val: safeNum(silverGram) },
-            { key: 'USD', name: 'Amerikan Doları', cat: 'Döviz', val: safeNum(usdTry) },
-            { key: 'EUR', name: 'Euro', cat: 'Döviz', val: safeNum(eurTry) },
-            { key: 'GBP', name: 'İngiliz Sterlini', cat: 'Döviz', val: safeNum(gbpTry) },
-        ];
+        // Kaynakta karşılığı olan her ürün gerçek piyasa fiyatından okunur.
+        // Yalnızca 18 Ayar'ın sembolü yok, o has altından saflık oranıyla türetilir.
+        const definitions: { key: string; name: string; cat: string; val: number | null }[] = [
+            { key: 'HAS_GRAM',   name: '24 Ayar (Has) Gram', cat: 'Altın', val: hasGram },
+            { key: '22_AYAR',    name: '22 Ayar Bilezik',    cat: 'Altın', val: px('AYAR22') },
+            { key: '18_AYAR',    name: '18 Ayar',            cat: 'Altın', val: hasGram === null ? null : hasGram * 0.750 },
+            { key: '14_AYAR',    name: '14 Ayar',            cat: 'Altın', val: px('AYAR14') },
+            { key: 'GRAM_ALTIN', name: 'Gram Altın',         cat: 'Altın', val: hasGram },
+            { key: 'CEYREK',     name: 'Çeyrek Altın',       cat: 'Altın', val: px('CEYREK') },
+            { key: 'YARIM',      name: 'Yarım Altın',        cat: 'Altın', val: px('YARIM') },
+            { key: 'TAM',        name: 'Tam Altın',          cat: 'Altın', val: px('TAM') },
+            { key: 'CUMHURIYET', name: 'Cumhuriyet Altını',  cat: 'Altın', val: px('ATA') },
+            { key: 'ATA',        name: 'Ata Altın',          cat: 'Altın', val: px('ATA') },
+            { key: 'GREMSE',     name: 'Gremse (2.5)',       cat: 'Altın', val: px('GREMSE') },
+            { key: 'GUMUS',      name: 'Gümüş (Gram)',       cat: 'Gümüş', val: px('GUMUS') },
+            { key: 'USD',        name: 'Amerikan Doları',    cat: 'Döviz', val: px('USD') },
+            { key: 'EUR',        name: 'Euro',               cat: 'Döviz', val: px('EUR') },
+            { key: 'GBP',        name: 'İngiliz Sterlini',   cat: 'Döviz', val: px('GBP') },
+        ].filter(d => d.val !== null);
 
         const newPrices: { [key: string]: ProductInfo } = {};
         definitions.forEach(d => {
             const prev = prevPricesRef.current[d.key] ?? null;
+            const val = d.val as number;
             newPrices[d.key] = {
                 key: d.key,
                 name: d.name,
                 cat: d.cat,
-                current: d.val,
+                current: val,
                 prev: prev,
-                change: prev !== null && prev !== 0 ? ((d.val - prev) / prev) * 100 : 0
+                change: prev !== null && prev !== 0 ? ((val - prev) / prev) * 100 : 0
             };
-            prevPricesRef.current[d.key] = d.val;
+            prevPricesRef.current[d.key] = val;
         });
 
         setPrices(newPrices);
@@ -159,7 +142,7 @@ const PriceAlerts: React.FC<PriceAlertsProps> = ({ marketData, lastUpdate, error
         }
         initialLoadDone.current = true;
         setCountdownVal(30);
-    }, [marketData]);
+    }, [liveRates]);
 
     // Countdown Timer
     useEffect(() => {
