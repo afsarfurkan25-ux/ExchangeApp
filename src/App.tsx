@@ -305,7 +305,10 @@ const DisplayScreen: React.FC = () => {
           color: 'rgba(212, 167, 49, 0.5)',
           letterSpacing: '3px',
           textTransform: 'uppercase',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          position: 'relative',
+          zIndex: 9999,
+          padding: '10px'
         }}
           className="footer-info-text"
           onClick={() => navigate('/login')}
