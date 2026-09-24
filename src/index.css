@@ -1,0 +1,272 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: #0a0e1a;
+}
+
+/* Flash animations for price changes */
+@keyframes flash-up {
+
+  0%,
+  100% {
+    color: inherit;
+  }
+
+  50% {
+    color: #22C55E;
+  }
+}
+
+@keyframes flash-down {
+
+  0%,
+  100% {
+    color: inherit;
+  }
+
+  50% {
+    color: #EF4444;
+  }
+}
+
+.flash-up {
+  animation: flash-up 1.5s ease;
+}
+
+.flash-down {
+  animation: flash-down 1.5s ease;
+}
+
+/* Blink animation for status dot */
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Ticker animation */
+@keyframes ticker {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0e1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8B6914;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D4A731;
+}
+
+/* --- MOBILE SPECIFIC OVERRIDES --- */
+.info-panel-overlay {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+
+  /* Layout adjustments */
+  .main-content {
+    flex-direction: column !important;
+    padding: 4px !important;
+    overflow-y: auto !important;
+    /* Allow scroll if needed on mobile */
+  }
+
+  /* Expandable right panel */
+  .info-panel-wrapper {
+    position: fixed !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 300px !important;
+    background: linear-gradient(180deg, #0d1225 0%, #0a0e1a 100%) !important;
+    z-index: 100;
+    padding: 16px !important;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -5px 0 20px rgba(0, 0, 0, 0.8);
+    height: 100dvh !important;
+  }
+
+  .info-panel-wrapper.open {
+    transform: translateX(0);
+  }
+
+  .mobile-close-btn-wrapper {
+    display: flex !important;
+  }
+
+  .info-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 90;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .info-panel-overlay.open {
+    display: block;
+    opacity: 1;
+  }
+
+  /* Toggle button visiblity */
+  .mobile-info-btn {
+    display: flex !important;
+  }
+
+  /* Specific fix for rate table container */
+  .rate-table-wrapper {
+    margin-right: 0 !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Table texts scaling for mobile */
+  .rt-th {
+    font-size: 11px !important;
+    padding: 8px 4px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .rt-td {
+    padding: 8px 4px !important;
+  }
+
+  .rt-name-cell {
+    gap: 4px !important;
+  }
+
+  .rt-icon {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 11px !important;
+    border-radius: 4px !important;
+  }
+
+  .rt-name {
+    font-size: 13px !important;
+  }
+
+  .rt-val {
+    font-size: 15px !important;
+  }
+
+  .rt-change {
+    font-size: 11px !important;
+  }
+
+  /* Header scaling */
+  .header-logo {
+    height: 40px !important;
+    left: 12px !important;
+  }
+
+  .header-title {
+    font-size: 20px !important;
+    padding: 0 40px !important;
+  }
+
+  .header-subtitle {
+    font-size: 8px !important;
+    letter-spacing: 3px !important;
+  }
+
+  /* Hide Footer TV Mod on mobile to make room for info toggle */
+  .desktop-tv-btn {
+    display: none !important;
+  }
+
+  /* Footer info text shift for mobile to prevent overlap if needed */
+  .footer-info-text {
+    font-size: 9px !important;
+    letter-spacing: 1px !important;
+    margin-left: 100px !important;
+  }
+
+  /* BottomBar adjustments */
+  .bottom-bar-wrapper {
+    padding: 6px 8px !important;
+    gap: 8px !important;
+  }
+
+  .bottom-bar-live-data {
+    gap: 8px !important;
+  }
+
+  .bottom-bar-label {
+    font-size: 8px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .bottom-bar-val {
+    font-size: 11px !important;
+  }
+
+  .bottom-bar-change {
+    font-size: 8px !important;
+    padding: 1px 2px !important;
+  }
+
+  .bottom-bar-brand {
+    display: none !important;
+    /* Hide kurmatik text on strict mobile space */
+  }
+
+  .ticker-container {
+    gap: 12px !important;
+  }
+
+  .ticker-item {
+    font-size: 9px !important;
+    gap: 3px !important;
+  }
+}
