@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://sptmzqontngwkdqyhvdg.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_oCgFRkEYm91EGrGSGu6lDg_37jS2TZl';
 
 if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-        'Supabase yapılandırması eksik. Proje kökündeki .env dosyasına VITE_SUPABASE_URL ve ' +
-        'VITE_SUPABASE_ANON_KEY değerlerini ekleyip dev sunucusunu yeniden başlatın. ' +
-        '(.env yalnızca açılışta okunur, kaydetmek tek başına yetmez.)'
+        'Supabase yapılandırması eksik. Proje kökündeki .env dosyasına veya ortam değişkenlerine ' +
+        'VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerlerini ekleyin.'
     );
 }
 

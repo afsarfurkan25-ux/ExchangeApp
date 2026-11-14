@@ -19,7 +19,8 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true, // Üretim sürümünde console.log'ları temizler (Tree shaking için faydalı)
+        drop_console: false,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
         drop_debugger: true,
       }
     }
