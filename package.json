@@ -65,6 +65,12 @@
   "build": {
     "appId": "com.kurmatik.exchangeapp",
     "productName": "Kurmatik Exchange",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "package.json"
+    ],
     "directories": {
       "output": "build-release"
     },

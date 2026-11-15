@@ -33,3 +33,4 @@ release
 release/
 build-release/
 *.exe
+!Kurmatik-Exchange-PC-Setup.exe
