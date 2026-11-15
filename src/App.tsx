@@ -99,12 +99,62 @@ const DisplayScreen: React.FC = () => {
 
   const userSettings = getUserSettings();
 
-  // TV Mode (Fullscreen)
+  // TV Mode & Ekran Uyku Engelleme (Wake Lock)
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const cursorTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // 1. Android TV / Kiosk Ekran Uyku Koruması (Wake Lock API)
+  useEffect(() => {
+    let wakeLockSentinel: any = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch (err) {
+        // Tarayıcı desteklemiyorsa veya arka plandaysa sessiz kal
+      }
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLockSentinel) {
+        wakeLockSentinel.release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // 2. 7/24 TV Bellek Temizliği (Her gece 04:00'te otomatik yenileme)
+  useEffect(() => {
+    const checkNightlyReload = () => {
+      const now = new Date();
+      // Gece 04:00 - 04:05 arasında günde yalnızca bir kez yenile
+      if (now.getHours() === 4 && now.getMinutes() < 5) {
+        const todayKey = now.toDateString();
+        const lastReload = localStorage.getItem('tv_last_nightly_reload');
+        if (lastReload !== todayKey) {
+          localStorage.setItem('tv_last_nightly_reload', todayKey);
+          window.location.reload();
+        }
+      }
+    };
+
+    const interval = setInterval(checkNightlyReload, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -124,21 +174,20 @@ const DisplayScreen: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  // Hide cursor after 3s of inactivity in fullscreen
+  // TV ve masaüstünde 3 saniye hareketsizlik sonrası fare imlecini gizle
   useEffect(() => {
-    if (!isFullscreen) { setShowCursor(true); return; }
     const handleMouseMove = () => {
       setShowCursor(true);
       if (cursorTimeout.current) clearTimeout(cursorTimeout.current);
       cursorTimeout.current = setTimeout(() => setShowCursor(false), 3000);
     };
-    handleMouseMove();
+
     document.addEventListener('mousemove', handleMouseMove);
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       if (cursorTimeout.current) clearTimeout(cursorTimeout.current);
     };
-  }, [isFullscreen]);
+  }, []);
 
   return (
     <div
@@ -151,7 +200,7 @@ const DisplayScreen: React.FC = () => {
         background: 'linear-gradient(180deg, #0d1225 0%, #0a0e1a 50%, #0d1225 100%)',
         position: 'relative',
         overflow: 'hidden',
-        cursor: isFullscreen && !showCursor ? 'none' : 'default',
+        cursor: !showCursor ? 'none' : 'default',
       }}
     >
       {/* Top border */}

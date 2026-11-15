@@ -432,17 +432,29 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
                 if (status !== 'SUBSCRIBED') console.warn('Supabase realtime durumu:', status);
             });
 
-        // Yalnızca realtime kopuksa devreye giren yedek yoklama.
+        // 7/24 TV Ekran Koruma Watchdog'u:
+        // Realtime bağlantısı kopsa veya sessizce donarsa fiyatların eski kalmasını önler.
+        let heartbeatCounter = 0;
         const pollInterval = setInterval(() => {
-            if (!realtimeOk.current && navigator.onLine) {
-                console.warn('Realtime bağlantısı yok, çekirdek veriler yoklanıyor...');
+            if (!navigator.onLine) return;
+
+            heartbeatCounter++;
+            // Realtime kopuksa her 15 saniyede bir dene; bağlıysa bile her 60 saniyede bir garanti senkron yap
+            if (!realtimeOk.current || heartbeatCounter % 4 === 0) {
                 refreshCore();
             }
-        }, 60000);
+        }, 15000);
+
+        // Ağ geri geldiğinde anında fiyatları tazele
+        const handleNetworkOnline = () => {
+            refreshCore();
+        };
+        window.addEventListener('online', handleNetworkOnline);
 
         return () => {
             supabase.removeChannel(channel);
             clearInterval(pollInterval);
+            window.removeEventListener('online', handleNetworkOnline);
         };
     }, [refreshCore]);
 

@@ -109,10 +109,8 @@ function BarChart({ gelir, gider, kar }: { gelir: number; gider: number; kar: nu
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const KarHesaplama: React.FC = () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const weekLater = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-    const [dateFrom, setDateFrom] = useState(today);
-    const [dateTo, setDateTo] = useState(weekLater);
+    const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+    const [dateTo, setDateTo] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
     const [periyor, setPeriyor] = useState('Günlük');
 
     const [gelirler, setGelirler] = useState<KalemItem[]>([
@@ -152,9 +150,10 @@ const KarHesaplama: React.FC = () => {
             rows.push('', `,,Toplam Gelir,${toplamGelir}`, `,,Toplam Gider,${toplamGider}`,
                 `,,Net Kar,${netKar}`, `,,Kar Marjı,%${karMarji.toFixed(2)}`);
         }
+        const todayStr = new Date().toISOString().slice(0, 10);
         const a = Object.assign(document.createElement('a'), {
             href: URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })),
-            download: `kurmatik-kar-${today}.csv`,
+            download: `kurmatik-kar-${todayStr}.csv`,
         });
         a.click();
     }
