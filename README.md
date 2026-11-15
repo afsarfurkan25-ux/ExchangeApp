@@ -1,3 +1,12 @@
+# Kurmatik Exchange v1.2 (Son Hali)
+
+Canlı döviz ve altın fiyat takip, kiosk, Android TV ve Windows masaüstü uygulaması.
+
+- **Sürüm:** 1.2.0 (son hali1.2)
+- **Tarih:** 15.11.2026
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
