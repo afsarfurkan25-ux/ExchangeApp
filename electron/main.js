@@ -71,6 +71,17 @@ function createWindow() {
         log.info('Main window loaded successfully');
     });
 
+    // Beyaz bos yeni pencere acilmasini engelle; her zaman ana pencerede ac veya dis tarayicida goster
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('file:') || url.startsWith('http://localhost') || url.includes('#')) {
+            mainWindow.loadURL(url);
+            return { action: 'deny' };
+        }
+        const { shell } = require('electron');
+        shell.openExternal(url);
+        return { action: 'deny' };
+    });
+
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
         log.error(`Main window failed to load: ${errorCode} - ${errorDescription} at ${validatedURL}`);
     });

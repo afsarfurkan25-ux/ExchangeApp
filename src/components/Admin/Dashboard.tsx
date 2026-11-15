@@ -723,32 +723,35 @@ const Dashboard: React.FC = () => {
                 <nav style={{ padding: '20px 10px', flex: 1 }}>
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <li>
-                            <a href="/" target="_blank" style={{
-                                width: '100%',
-                                padding: '12px 16px',
-                                background: 'transparent',
-                                border: 'none',
-                                borderLeft: '3px solid transparent',
-                                color: '#8B97B8',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                borderRadius: '0 6px 6px 0',
-                                transition: 'all 0.3s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                overflow: 'hidden',
-                                textDecoration: 'none',
-                                fontSize: '14px',
-                                fontWeight: 500,
-                                boxSizing: 'border-box',
-                            }}
+                            <button
+                                type="button"
+                                onClick={() => navigate('/')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 16px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    borderLeft: '3px solid transparent',
+                                    color: '#8B97B8',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    borderRadius: '0 6px 6px 0',
+                                    transition: 'all 0.3s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    overflow: 'hidden',
+                                    textDecoration: 'none',
+                                    fontSize: '14px',
+                                    fontWeight: 500,
+                                    boxSizing: 'border-box',
+                                }}
                                 onMouseEnter={(e) => e.currentTarget.style.color = '#F5D56E'}
                                 onMouseLeave={(e) => e.currentTarget.style.color = '#8B97B8'}
                             >
                                 <div style={{ minWidth: '20px', textAlign: 'center', fontWeight: 'bold' }}>🏠</div>
                                 {isSidebarOpen && <span style={{ whiteSpace: 'nowrap' }}>Ana Sayfa</span>}
-                            </a>
+                            </button>
                         </li>
                         <SidebarItem
                             label="Piyasa Canlı"
@@ -859,20 +862,24 @@ const Dashboard: React.FC = () => {
                         <p style={{ color: '#8B97B8', fontSize: '14px', marginTop: '4px' }}>Kurmatik.net Yönetim Sistemi</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <a href="/" target="_blank" style={{
-                            color: '#F5D56E',
-                            textDecoration: 'none',
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            padding: '8px 16px',
-                            background: 'rgba(212, 167, 49, 0.1)',
-                            border: '1px solid rgba(212, 167, 49, 0.2)',
-                            borderRadius: '10px',
-                            transition: 'all 0.3s'
-                        }}
+                        <button
+                            type="button"
+                            onClick={() => navigate('/')}
+                            style={{
+                                color: '#F5D56E',
+                                textDecoration: 'none',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                padding: '8px 16px',
+                                background: 'rgba(212, 167, 49, 0.1)',
+                                border: '1px solid rgba(212, 167, 49, 0.2)',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s'
+                            }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212, 167, 49, 0.2)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(212, 167, 49, 0.1)'; }}
-                        >Sistem Ekranını Aç &rarr;</a>
+                        >Sistem Ekranını Aç &rarr;</button>
 
                         <NotificationBell />
 
