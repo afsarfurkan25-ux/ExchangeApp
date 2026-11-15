@@ -64,16 +64,20 @@ const DisplayScreen: React.FC = () => {
   const navigate = useNavigate();
   const { settings, rates, currentUser } = context;
 
-  // Shortcut for Login: Alt + L
+  // Shortcut for Login / Panel: Alt + L
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && e.key.toLowerCase() === 'l') {
-        navigate('/login');
+        if (currentUser) {
+          navigate(currentUser.role === 'Admin' || currentUser.role === 'Yönetici' ? '/admin' : '/panel');
+        } else {
+          navigate('/login');
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate]);
+  }, [navigate, currentUser]);
 
   // Real-time presence tracking
   usePresence(currentUser);
@@ -351,7 +355,7 @@ const DisplayScreen: React.FC = () => {
         <span style={{
           fontSize: '11px',
           fontWeight: 700,
-          color: 'rgba(212, 167, 49, 0.5)',
+          color: currentUser ? '#F5D56E' : 'rgba(212, 167, 49, 0.5)',
           letterSpacing: '3px',
           textTransform: 'uppercase',
           cursor: 'pointer',
@@ -360,10 +364,43 @@ const DisplayScreen: React.FC = () => {
           padding: '10px'
         }}
           className="footer-info-text"
-          onClick={() => navigate('/login')}
+          onClick={() => {
+            if (currentUser) {
+              navigate(currentUser.role === 'Admin' || currentUser.role === 'Yönetici' ? '/admin' : '/panel');
+            } else {
+              navigate('/login');
+            }
+          }}
         >
-          FİYATLAR BİLGİ AMAÇLIDIR
+          {currentUser ? `⚙ YÖNETİM PANELİNE GİT (${currentUser.name})` : 'FİYATLAR BİLGİ AMAÇLIDIR'}
         </span>
+
+        {currentUser && (
+          <button
+            onClick={() => navigate(currentUser.role === 'Admin' || currentUser.role === 'Yönetici' ? '/admin' : '/panel')}
+            style={{
+              position: 'absolute',
+              right: isFullscreen ? '110px' : '140px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: isFullscreen ? '5px 12px' : '5px 14px',
+              background: 'linear-gradient(135deg, rgba(212, 167, 49, 0.25), rgba(139, 105, 20, 0.25))',
+              border: '1px solid #D4A731',
+              borderRadius: '8px',
+              color: '#F5D56E',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              letterSpacing: '0.5px',
+              zIndex: 10
+            }}
+            title="Yönetim Paneline Geri Dön"
+          >
+            ⚙ Paneli Aç ({currentUser.name})
+          </button>
+        )}
 
         <button
           onClick={toggleFullscreen}

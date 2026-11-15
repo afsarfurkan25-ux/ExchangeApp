@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useExchange } from '../../hooks/useExchange';
 import { supabase } from '../../supabaseClient';
 import { validateEmail } from '../../utils/validation';
 
 const Login: React.FC = () => {
-    const [username, setUsername] = useState('');
+    const savedRememberMe = localStorage.getItem('kurmatik_remember_me') === 'true';
+    const savedUsername = localStorage.getItem('kurmatik_remembered_username') || '';
+
+    const [username, setUsername] = useState(savedUsername);
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [rememberMe, setRememberMe] = useState(false);
+    const [rememberMe, setRememberMe] = useState(savedRememberMe);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Forgot Password State
     const [showForgotPw, setShowForgotPw] = useState(false);
@@ -17,7 +21,18 @@ const Login: React.FC = () => {
     const [forgotPwLoading, setForgotPwLoading] = useState(false);
 
     const navigate = useNavigate();
-    const { authenticateUser } = useExchange();
+    const { currentUser, isAuthChecking, authenticateUser } = useExchange();
+
+    // Oturum zaten açıksa doğrudan panele yönlendir
+    useEffect(() => {
+        if (!isAuthChecking && currentUser) {
+            if (currentUser.role === 'Admin' || currentUser.role === 'Yönetici') {
+                navigate('/admin', { replace: true });
+            } else {
+                navigate('/panel', { replace: true });
+            }
+        }
+    }, [currentUser, isAuthChecking, navigate]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,8 +43,19 @@ const Login: React.FC = () => {
             return;
         }
 
+        setIsSubmitting(true);
+
+        if (rememberMe) {
+            localStorage.setItem('kurmatik_remember_me', 'true');
+            localStorage.setItem('kurmatik_remembered_username', username.trim());
+        } else {
+            localStorage.removeItem('kurmatik_remember_me');
+            localStorage.removeItem('kurmatik_remembered_username');
+        }
+
         // Proceed to custom authentication logic (checks 'members' table)
-        const result = await authenticateUser(username.trim(), password);
+        const result = await authenticateUser(username.trim(), password, rememberMe);
+        setIsSubmitting(false);
 
         if (result.success && result.user) {
             // Yönetim paneline erişimi olan roller oraya, diğerleri kendi paneline.
@@ -287,24 +313,26 @@ const Login: React.FC = () => {
                     {/* Submit */}
                     <button
                         type="submit"
+                        disabled={isSubmitting}
                         style={{
-                            background: 'linear-gradient(135deg, #D4A731, #8B6914)',
+                            background: isSubmitting ? '#5A6480' : 'linear-gradient(135deg, #D4A731, #8B6914)',
                             color: '#0a0e1a',
                             padding: '15px',
                             borderRadius: '12px',
                             border: 'none',
                             fontWeight: 700,
                             fontSize: '15px',
-                            cursor: 'pointer',
+                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
                             transition: 'all 0.3s',
                             marginTop: '8px',
                             boxShadow: '0 4px 20px rgba(212, 167, 49, 0.3)',
-                            letterSpacing: '0.5px'
+                            letterSpacing: '0.5px',
+                            opacity: isSubmitting ? 0.7 : 1
                         }}
-                        onMouseOver={(e) => (e.target as any).style.filter = 'brightness(1.1)'}
+                        onMouseOver={(e) => { if (!isSubmitting) (e.target as any).style.filter = 'brightness(1.1)'; }}
                         onMouseOut={(e) => (e.target as any).style.filter = 'none'}
                     >
-                        GİRİŞ YAP
+                        {isSubmitting ? 'GİRİŞ YAPILIYOR...' : 'GİRİŞ YAP'}
                     </button>
 
                     <div style={{ marginTop: '16px', color: '#8B97B8', fontSize: '14px' }}>

@@ -1,3 +1,5 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useExchange } from '../../hooks/useExchange';
 
 interface HeaderProps {
@@ -5,7 +7,8 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ shopName }) => {
-    const { isOffline, lastUpdated } = useExchange();
+    const { isOffline, lastUpdated, currentUser } = useExchange();
+    const navigate = useNavigate();
 
     return (
         <div style={{
@@ -81,15 +84,52 @@ const Header: React.FC<HeaderProps> = ({ shopName }) => {
                 — Kuyumculuk —
             </div>
 
-            <span style={{
-                position: 'absolute',
-                right: '24px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                fontSize: '20px',
-                color: '#D4A731',
-                opacity: 0.6
-            }}>✦</span>
+            {currentUser ? (
+                <button
+                    onClick={() => navigate(currentUser.role === 'Admin' || currentUser.role === 'Yönetici' ? '/admin' : '/panel')}
+                    style={{
+                        position: 'absolute',
+                        right: isOffline ? '180px' : '20px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 14px',
+                        background: 'rgba(212, 167, 49, 0.15)',
+                        border: '1px solid rgba(212, 167, 49, 0.35)',
+                        borderRadius: '20px',
+                        color: '#F5D56E',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                        zIndex: 20
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(212, 167, 49, 0.3)';
+                        e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(212, 167, 49, 0.15)';
+                        e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                    }}
+                >
+                    <span>⚙ {currentUser.name}</span>
+                    <span style={{ fontSize: '11px', opacity: 0.85 }}>Panel &rarr;</span>
+                </button>
+            ) : (
+                <span style={{
+                    position: 'absolute',
+                    right: '24px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '20px',
+                    color: '#D4A731',
+                    opacity: 0.6
+                }}>✦</span>
+            )}
             <style>{`
                 @keyframes pulse {
                     0%, 100% { opacity: 1; }

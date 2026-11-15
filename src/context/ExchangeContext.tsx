@@ -137,7 +137,7 @@ export interface ExchangeContextType {
     clearHistory: () => Promise<void>;
     /** İlgili panel açıldığında ihtiyaç duyduğu tabloları yükler. */
     refreshTables: (tables: LazyTable[]) => Promise<void>;
-    authenticateUser: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: Member }>;
+    authenticateUser: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string; user?: Member }>;
     logoutUser: () => Promise<void>;
     lastUpdated: Date;
     isOffline: boolean;
@@ -229,21 +229,56 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         const checkSession = async () => {
             const savedUserStr = localStorage.getItem('currentUser');
             const sessionId = localStorage.getItem('currentSessionId');
+            const isPersistent = localStorage.getItem('kurmatik_session_persistent') === 'true';
 
-            if (savedUserStr && sessionId) {
+            if (savedUserStr) {
                 try {
                     const savedUser = JSON.parse(savedUserStr);
-                    // Veritabanından bu oturumun hala aktif olup olmadığını kontrol et
-                    const { data } = await supabase
-                        .from('user_sessions')
-                        .select('is_active')
-                        .eq('id', sessionId)
-                        .single();
+                    const isUuid = sessionId ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) : false;
 
-                    if (data && data.is_active) {
+                    if (sessionId && isUuid) {
+                        // Veritabanından bu oturumun hala aktif olup olmadığını kontrol et
+                        const { data, error } = await supabase
+                            .from('user_sessions')
+                            .select('is_active')
+                            .eq('id', sessionId)
+                            .maybeSingle();
+
+                        if (!error && data) {
+                            if (data.is_active) {
+                                setCurrentUser(savedUser);
+                            } else {
+                                // Veritabanında açıkça kapatılmış (deaktive edilmiş)
+                                localStorage.removeItem('currentUser');
+                                localStorage.removeItem('currentSessionId');
+                                localStorage.removeItem('kurmatik_session_persistent');
+                                setCurrentUser(null);
+                            }
+                        } else if (error) {
+                            // Ağ hatası veya çevrimdışı: yerel oturumu düşürme
+                            console.warn('Oturum doğrulama sırasında ağ sorunu, yerel oturum korunuyor:', error);
+                            setCurrentUser(savedUser);
+                        } else {
+                            // Veritabanında session silinmiş ama 'beni hatırla' aktifse oturumu koru
+                            if (isPersistent) {
+                                setCurrentUser(savedUser);
+                                onMemberLogin(savedUser).then(s => {
+                                    if (s?.id) localStorage.setItem('currentSessionId', s.id);
+                                }).catch(() => {});
+                            } else {
+                                localStorage.removeItem('currentUser');
+                                localStorage.removeItem('currentSessionId');
+                                setCurrentUser(null);
+                            }
+                        }
+                    } else if (isPersistent) {
+                        // Beni hatırla aktif ve kayıt var
                         setCurrentUser(savedUser);
+                        onMemberLogin(savedUser).then(s => {
+                            if (s?.id) localStorage.setItem('currentSessionId', s.id);
+                        }).catch(() => {});
                     } else {
-                        // Bypass tespiti veya oturum kapatılmış
+                        // Geçersiz veya sessionsız durum
                         localStorage.removeItem('currentUser');
                         localStorage.removeItem('currentSessionId');
                         setCurrentUser(null);
@@ -252,10 +287,8 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
                     console.error('Error parsing or verifying session:', error);
                     localStorage.removeItem('currentUser');
                     localStorage.removeItem('currentSessionId');
+                    setCurrentUser(null);
                 }
-            } else if (savedUserStr && !sessionId) {
-                // Sadece username var ama session yok (Bypass girişimi)
-                localStorage.removeItem('currentUser');
             }
             setIsAuthChecking(false);
         };
@@ -833,7 +866,7 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         return true;
     }, [currentUser]);
 
-    const authenticateUser = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string; user?: Member }> => {
+    const authenticateUser = useCallback(async (username: string, password: string, rememberMe: boolean = false): Promise<{ success: boolean; error?: string; user?: Member }> => {
         // Üye listesi artık önden indirilmiyor; yalnızca giriş yapan kişinin
         // kaydı sorgulanır. .eq() değeri kaçışlar, PostgREST filtresine
         // kullanıcı girdisi enjekte edilemez.
@@ -871,11 +904,20 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (authData.user && authData.session) {
             setCurrentUser(member);
             localStorage.setItem('currentUser', JSON.stringify(member));
-            localStorage.setItem('currentSessionId', authData.session.access_token);
+            if (rememberMe) {
+                localStorage.setItem('kurmatik_session_persistent', 'true');
+            } else {
+                localStorage.removeItem('kurmatik_session_persistent');
+            }
 
             try {
-                await onMemberLogin(member);
-            } catch (e) { }
+                const sessionData = await onMemberLogin(member);
+                if (sessionData?.id) {
+                    localStorage.setItem('currentSessionId', sessionData.id);
+                }
+            } catch (e) {
+                console.error('Session logging error:', e);
+            }
 
             return { success: true, user: member };
         }
@@ -926,6 +968,11 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         // Güvenlik adımını geçen veya başarıyla arka planda Supabase'e kaydedilen eski üyeyi içeri al.
         setCurrentUser(member);
         localStorage.setItem('currentUser', JSON.stringify(member));
+        if (rememberMe) {
+            localStorage.setItem('kurmatik_session_persistent', 'true');
+        } else {
+            localStorage.removeItem('kurmatik_session_persistent');
+        }
 
         try {
             const sessionData = await onMemberLogin(member);
@@ -952,8 +999,8 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         setCurrentUser(null);
         localStorage.removeItem('currentUser');
-        localStorage.removeItem('currentUser');
         localStorage.removeItem('currentSessionId');
+        localStorage.removeItem('kurmatik_session_persistent');
     }, [currentUser]);
 
     const contextValue = useMemo(() => ({
