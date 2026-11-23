@@ -137,6 +137,8 @@ export interface ExchangeContextType {
     clearHistory: () => Promise<void>;
     /** İlgili panel açıldığında ihtiyaç duyduğu tabloları yükler. */
     refreshTables: (tables: LazyTable[]) => Promise<void>;
+    /** Tüm verileri (fiyatlar, ayarlar, tablolar) tek seferde sunucudan tazeler */
+    refreshAllData: () => Promise<void>;
     authenticateUser: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string; user?: Member }>;
     logoutUser: () => Promise<void>;
     lastUpdated: Date;
@@ -425,6 +427,13 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
             }
         }));
     }, [fetchMembers, fetchHistoryLogs, fetchSessions, fetchActivities]);
+
+    const refreshAllData = useCallback(async () => {
+        await Promise.all([
+            refreshCore(),
+            refreshTables(['members', 'history_logs', 'user_sessions', 'activities'])
+        ]);
+    }, [refreshCore, refreshTables]);
 
     useEffect(() => {
         const init = async () => {
@@ -1021,6 +1030,7 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateCurrentMemberProfile,
         clearHistory,
         refreshTables,
+        refreshAllData,
         liveMarketRates,
         updateRateMargin,
         authenticateUser,
@@ -1028,7 +1038,7 @@ export const ExchangeProvider: React.FC<{ children: ReactNode }> = ({ children }
         lastUpdated,
         isOffline,
         isAuthChecking
-    }), [rates, tickerItems, members, settings, liveRates, historyLogs, sessions, activities, currentUser, lastUpdated, isOffline, isAuthChecking, updateSettings, updateRates, updateTickerItems, updateMembers, updateMemberPassword, updateCurrentMemberProfile, clearHistory, refreshTables, liveMarketRates, updateRateMargin, authenticateUser, logoutUser]);
+    }), [rates, tickerItems, members, settings, liveRates, historyLogs, sessions, activities, currentUser, lastUpdated, isOffline, isAuthChecking, updateSettings, updateRates, updateTickerItems, updateMembers, updateMemberPassword, updateCurrentMemberProfile, clearHistory, refreshTables, refreshAllData, liveMarketRates, updateRateMargin, authenticateUser, logoutUser]);
 
     return (
         <ExchangeContext.Provider value={contextValue}>

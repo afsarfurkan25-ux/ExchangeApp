@@ -20,7 +20,27 @@ const getUserSettingsKey = (username: string) => `userPanelSettings_${username}`
 
 const UserPanel: React.FC = () => {
     const navigate = useNavigate();
-    const { rates, settings, currentUser, liveRates, logoutUser, lastUpdated, updateRates, updateTickerItems, tickerItems, historyLogs, updateCurrentMemberProfile, refreshTables, liveMarketRates } = useExchange();
+    const { rates, settings, currentUser, liveRates, logoutUser, lastUpdated, updateRates, updateTickerItems, tickerItems, historyLogs, updateCurrentMemberProfile, refreshTables, liveMarketRates, refreshAllData } = useExchange();
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [refreshSuccess, setRefreshSuccess] = useState(false);
+
+    const handleGetUpdates = async () => {
+        setIsRefreshing(true);
+        try {
+            await refreshAllData();
+            const loaded = loadUserSettings();
+            setUserSettings(loaded);
+            setLocalShopName(loaded.shopName);
+            setLocalScrollingText(loaded.scrollingText);
+            setLocalQrUrl(loaded.qrUrl || "");
+            setRefreshSuccess(true);
+            setTimeout(() => setRefreshSuccess(false), 2500);
+        } catch (e) {
+            console.error('Veri yenileme hatası:', e);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const loadUserSettings = (): UserPanelSettings => {
         if (!currentUser?.name) return {
@@ -423,7 +443,40 @@ const UserPanel: React.FC = () => {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Güncellemeleri Al Butonu */}
+                    <button
+                        onClick={handleGetUpdates}
+                        disabled={isRefreshing}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            background: refreshSuccess
+                                ? 'rgba(16, 185, 129, 0.15)'
+                                : 'linear-gradient(135deg, rgba(212, 167, 49, 0.15), rgba(212, 167, 49, 0.05))',
+                            border: refreshSuccess
+                                ? '1px solid rgba(16, 185, 129, 0.4)'
+                                : '1px solid rgba(212, 167, 49, 0.3)',
+                            borderRadius: '10px',
+                            color: refreshSuccess ? '#34D399' : '#F5D56E',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: isRefreshing ? 'wait' : 'pointer',
+                            transition: 'all 0.3s ease',
+                            opacity: isRefreshing ? 0.7 : 1,
+                        }}
+                        title="Sunucudaki en güncel fiyat ve ayarları anında çek"
+                    >
+                        <span style={{
+                            display: 'inline-block',
+                            transition: 'transform 0.5s',
+                            transform: isRefreshing ? 'rotate(360deg)' : 'none'
+                        }}>🔄</span>
+                        <span>{isRefreshing ? 'Alınıyor...' : refreshSuccess ? 'Güncellendi!' : 'Güncellemeleri Al'}</span>
+                    </button>
+
                     {/* Ana Sayfa Link */}
                     <Link to="/" style={{
                         display: 'flex',

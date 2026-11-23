@@ -98,7 +98,8 @@ const Register: React.FC = () => {
                 password: hashedPassword,
                 role: 'Üye',
                 shop_name: shopName.trim(),
-                email: email.trim()
+                email: email.trim(),
+                status: 'Aktif'
             };
 
             const { error: dbError } = await supabase
@@ -114,14 +115,14 @@ const Register: React.FC = () => {
             }
 
             // Success
-            setSuccessMsg('Kayıt başarılı! Lütfen e-posta adresinize gönderilen doğrulama bağlantısına tıklayın.');
+            setSuccessMsg('Kayıt başarılı! Giriş ekranına yönlendiriliyorsunuz...');
 
             // Clear form
             setFirstName(''); setLastName(''); setUsername(''); setShopName('');
             setEmail(''); setPassword(''); setPasswordConfirm(''); setAcceptedTerms(false);
 
-            // Optional: Redirect after a few seconds
-            setTimeout(() => navigate('/login'), 3000);
+            // Redirect after a short delay
+            setTimeout(() => navigate('/login'), 1500);
 
         } catch (err: any) {
             console.error("Unexpected error:", err);

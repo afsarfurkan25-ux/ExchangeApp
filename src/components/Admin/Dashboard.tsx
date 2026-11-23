@@ -22,7 +22,22 @@ import RateManagement from './RateManagement';
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const context = useExchange();
-    const { settings, updateSettings, rates, updateRates, tickerItems, updateTickerItems, members, updateMembers, updateMemberPassword, historyLogs, clearHistory, logoutUser, currentUser, refreshTables, liveMarketRates } = context;
+    const { settings, updateSettings, rates, updateRates, tickerItems, updateTickerItems, members, updateMembers, updateMemberPassword, historyLogs, clearHistory, logoutUser, currentUser, refreshTables, liveMarketRates, refreshAllData } = context;
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [refreshSuccess, setRefreshSuccess] = useState(false);
+
+    const handleGetUpdates = async () => {
+        setIsRefreshing(true);
+        try {
+            await refreshAllData();
+            setRefreshSuccess(true);
+            setTimeout(() => setRefreshSuccess(false), 2500);
+        } catch (e) {
+            console.error('Veri yenileme hatası:', e);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const [localShopName, setLocalShopName] = useState(settings.shopName);
     const [localTicker, setLocalTicker] = useState(settings.scrollingText);
@@ -153,10 +168,16 @@ const Dashboard: React.FC = () => {
         ? new Date(Math.max(...liveMarketRates.map(l => new Date(l.updated_at).getTime())))
         : null;
 
-    // Yönetim panelinin ihtiyaç duyduğu tablolar; yalnızca panel açıldığında
+    // Yönetim panelinin ihtiyaç duyduğu tablolar; panel açıldığında veya sekmeye girildiğinde
     useEffect(() => {
         refreshTables(['members', 'history_logs']);
     }, [refreshTables]);
+
+    useEffect(() => {
+        if (activeTab === 'members') {
+            refreshTables(['members']);
+        }
+    }, [activeTab, refreshTables]);
 
     // Sync local members with context
     useEffect(() => {
@@ -861,7 +882,40 @@ const Dashboard: React.FC = () => {
                         </h1>
                         <p style={{ color: '#8B97B8', fontSize: '14px', marginTop: '4px' }}>Kurmatik.net Yönetim Sistemi</p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Güncellemeleri Al Butonu */}
+                        <button
+                            onClick={handleGetUpdates}
+                            disabled={isRefreshing}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                background: refreshSuccess
+                                    ? 'rgba(16, 185, 129, 0.15)'
+                                    : 'linear-gradient(135deg, rgba(212, 167, 49, 0.15), rgba(212, 167, 49, 0.05))',
+                                border: refreshSuccess
+                                    ? '1px solid rgba(16, 185, 129, 0.4)'
+                                    : '1px solid rgba(212, 167, 49, 0.3)',
+                                borderRadius: '10px',
+                                color: refreshSuccess ? '#34D399' : '#F5D56E',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: isRefreshing ? 'wait' : 'pointer',
+                                transition: 'all 0.3s ease',
+                                opacity: isRefreshing ? 0.7 : 1,
+                            }}
+                            title="Sunucudaki en güncel fiyat ve ayarları anında çek"
+                        >
+                            <span style={{
+                                display: 'inline-block',
+                                transition: 'transform 0.5s',
+                                transform: isRefreshing ? 'rotate(360deg)' : 'none'
+                            }}>🔄</span>
+                            <span>{isRefreshing ? 'Alınıyor...' : refreshSuccess ? 'Güncellendi!' : 'Güncellemeleri Al'}</span>
+                        </button>
+
                         <button
                             type="button"
                             onClick={() => navigate('/')}

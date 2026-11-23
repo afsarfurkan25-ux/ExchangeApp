@@ -375,33 +375,6 @@ const DisplayScreen: React.FC = () => {
           {currentUser ? `⚙ YÖNETİM PANELİNE GİT (${currentUser.name})` : 'FİYATLAR BİLGİ AMAÇLIDIR'}
         </span>
 
-        {currentUser && (
-          <button
-            onClick={() => navigate(currentUser.role === 'Admin' || currentUser.role === 'Yönetici' ? '/admin' : '/panel')}
-            style={{
-              position: 'absolute',
-              right: isFullscreen ? '110px' : '140px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: isFullscreen ? '5px 12px' : '5px 14px',
-              background: 'linear-gradient(135deg, rgba(212, 167, 49, 0.25), rgba(139, 105, 20, 0.25))',
-              border: '1px solid #D4A731',
-              borderRadius: '8px',
-              color: '#F5D56E',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              letterSpacing: '0.5px',
-              zIndex: 10
-            }}
-            title="Yönetim Paneline Geri Dön"
-          >
-            ⚙ Paneli Aç ({currentUser.name})
-          </button>
-        )}
-
         <button
           onClick={toggleFullscreen}
           style={{
