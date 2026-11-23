@@ -28,12 +28,19 @@ const UserPanel: React.FC = () => {
         setIsRefreshing(true);
         try {
             await refreshAllData();
+            setRefreshSuccess(true);
+            // Canlı Vercel ortamında çalışıyorsa yeni kod paketini anında çekmek için sayfayı yenile
+            if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('kurmatik.net')) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 800);
+                return;
+            }
             const loaded = loadUserSettings();
             setUserSettings(loaded);
             setLocalShopName(loaded.shopName);
             setLocalScrollingText(loaded.scrollingText);
             setLocalQrUrl(loaded.qrUrl || "");
-            setRefreshSuccess(true);
             setTimeout(() => setRefreshSuccess(false), 2500);
         } catch (e) {
             console.error('Veri yenileme hatası:', e);

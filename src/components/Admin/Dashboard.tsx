@@ -31,6 +31,12 @@ const Dashboard: React.FC = () => {
         try {
             await refreshAllData();
             setRefreshSuccess(true);
+            if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('kurmatik.net')) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 800);
+                return;
+            }
             setTimeout(() => setRefreshSuccess(false), 2500);
         } catch (e) {
             console.error('Veri yenileme hatası:', e);

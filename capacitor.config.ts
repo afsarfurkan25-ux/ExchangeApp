@@ -5,6 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Kurmatik Exchange',
   webDir: 'dist',
   server: {
+    url: 'https://exchange-app-alpha.vercel.app',
     androidScheme: 'https',
     cleartext: true
   },
